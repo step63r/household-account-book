@@ -1,0 +1,18 @@
+node_modules/
+dist/
+build/
+coverage/
+
+# CDK
+cdk.out/
+
+# env / secrets
+.env
+.env.local
+.env.*.local
+
+# editors / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+*.log

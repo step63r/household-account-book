@@ -1,0 +1,24 @@
+{
+  "name": "@household/infra",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "synth": "cdk synth",
+    "diff": "cdk diff",
+    "cdk": "cdk"
+  },
+  "dependencies": {
+    "@aws-cdk/aws-amplify-alpha": "^2.262.0-alpha.0",
+    "aws-cdk-lib": "^2.262.0",
+    "constructs": "^10.7.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "aws-cdk": "2.1132.1",
+    "esbuild": "^0.28.1",
+    "tsx": "^4.23.0",
+    "typescript": "^5.7.3"
+  }
+}
