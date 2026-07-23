@@ -1,11 +1,16 @@
 /**
  * ローカル（localStorage）データストア。
  *
- * バックエンド API が未実装のため、Categories/Transactions/Budgets の CRUD を
- * ブラウザ内で完結させるための暫定実装。スキーマは `@household/shared` の型・
- * Zod スキーマをそのまま利用する。
+ * バックエンド API が未実装の Transactions/Budgets の CRUD をブラウザ内で完結させるための
+ * 暫定実装。スキーマは `@household/shared` の型・Zod スキーマをそのまま利用する。
  *
- * TODO(backend): API Gateway + Lambda のエンドポイントが用意でき次第、
+ * Categories は apps/backend に実装済みのため、`CategoriesPage.tsx` など各ページは
+ * `src/lib/categories.ts`（`apiFetch` 経由で実 API を叩く）を使う。ここに残っている
+ * Categories 関連の関数（`getCategories` 等）は、この localStorage 内で Transactions/Budgets
+ * のシードデータを生成する際に使う内部依存としてのみ残している（実 API の費目データとは
+ * 別物になる点に注意）。
+ *
+ * TODO(backend): API Gateway + Lambda の Transactions/Budgets エンドポイントが用意でき次第、
  * この実装は `src/lib/api.ts` の `apiFetch` を使った呼び出しに差し替える。
  * 呼び出し側（TanStack Query の queryFn/mutationFn）のシグネチャは維持できるように
  * 関数単位で分けてある。

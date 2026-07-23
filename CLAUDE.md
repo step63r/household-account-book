@@ -68,10 +68,15 @@ pnpmワークスペース（`pnpm-workspace.yaml`）。ルート`package.json`�
 - `cd infra && pnpm exec cdk synth` / `cdk diff` — CDKの構文検証・差分確認（副作用なし、ローカルで安全に実行可）
 - `cdk deploy` は実AWSへの課金・破壊的操作を伴うため、`infra-cdk`エージェント/CLAUDE.mdの方針どおり、実行前に必ずユーザーへ確認すること（このリポジトリではまだ一度もdeployしていない）
 
-## 実装状況（スキャフォールディング完了時点）
+## 実装状況
 
 - バックエンド: 費目（カテゴリ）CRUDのみ実装済み（DynamoDB連携・監査ログ込み）。取引・予算・集計系エンドポイントはハンドラの型・ルートのみ用意したスタブ（501を返す）
-- フロントエンド: 全画面（ダッシュボード/取引/予算/費目/ログイン・サインアップ/設定）が動作するが、データは`src/lib/local-store.ts`のlocalStorageモック。各呼び出し箇所に`TODO(backend): ...`コメントで実API差し替え箇所を明記済み
-- 認証: Cognitoへの直接連携は未実装（`apps/frontend/src/lib/auth.ts`がスタブ）。ログイン/サインアップはこのAPIを経由せずCognitoに直接繋ぐ設計（バックエンドに`/auth/*`エンドポイントは存在しない）
+- フロントエンド:
+  - 費目（カテゴリ）は実バックエンドAPI（`GET/POST /categories`, `PUT/DELETE /categories/{id}`）に配線済み（`src/lib/categories.ts`）
+  - 取引・予算・ダッシュボード集計は引き続き`src/lib/local-store.ts`のlocalStorageモック（backendが未実装のため）。各呼び出し箇所に`TODO(backend): ...`コメントで実API差し替え箇所を明記済み
+  - 認証: `amazon-cognito-identity-js`でCognito User Poolに直接連携（サインアップ→確認コード→ログイン→ログアウト）を実装済み（`src/lib/auth.ts`）。バックエンドを経由しない設計（`/auth/*`エンドポイントは存在しない、CLAUDE.mdの方針どおり）
+  - ルート保護実装済み（未ログイン時はDashboard等から`/login`へリダイレクト、`src/components/auth/RequireAuth.tsx`）
+  - 追加env: `VITE_COGNITO_USER_POOL_ID` / `VITE_COGNITO_CLIENT_ID`（`Household-<stage>-Auth`スタックの出力値。`.env.example`参照）
+  - **未デプロイのため未検証**: 実際のサインアップ/ログイン/カテゴリAPI疎通はCognito User Pool・API Gatewayをデプロイして初めて確認できる。env未設定時は「認証設定が未構成です」と表示し、クラッシュしないことのみ確認済み
 - 未着手の既知ギャップ: 退会（`POST /users/me/withdraw`相当）はバックエンド側にハンドラ自体が未作成。着手時に追加すること
-- インフラ: 5スタック（Auth/Data/Api/Hosting/Monitoring）で`cdk synth`確認済み。Amplify HostingのGitHub連携とアラート通知先メールはコンテキストパラメータのプレースホルダーのみ（`amplifyGithubRepoUrl`, `amplifyGithubTokenSecretName`, `alertEmail`）
+- インフラ: 5スタック（Auth/Data/Api/Hosting/Monitoring）で`cdk synth`確認済み。**まだAWSへ一度もdeployしていない**。Amplify HostingのGitHub連携とアラート通知先メールはコンテキストパラメータのプレースホルダーのみ（`amplifyGithubRepoUrl`, `amplifyGithubTokenSecretName`, `alertEmail`）

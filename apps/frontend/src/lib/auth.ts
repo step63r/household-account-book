@@ -1,35 +1,162 @@
 /**
- * 認証まわりのスタブ。
+ * 認証まわり（Amazon Cognito User Pool 連携）。
  *
- * Amazon Cognito User Pool 連携（メール/パスワード）は未実装。ここでは呼び出し口（シーム）
- * だけを定義し、フォーム側は既にこのインターフェースに対して実装してある。
+ * `amazon-cognito-identity-js` を使い、Cognito User Pool に対して SDK 経由で直接
+ * 認証する（Cognito Hosted UI は使わない）。バックエンドには `/auth/*` エンドポイントは
+ * 存在しない設計（CLAUDE.md 参照）。
  *
- * TODO(backend/auth): 実装時は `amazon-cognito-identity-js` または AWS Amplify Auth を使い、
- * - signInWithEmailPassword: CognitoUser.authenticateUser 相当
- * - signUpWithEmailPassword: CognitoUserPool.signUp 相当（要メール確認フローの追加検討）
- * - requestAccountWithdrawal: バックエンドの POST /users/me/withdraw 呼び出し
- * に置き換える。トークン取得は `src/lib/api.ts` の `getAuthToken` と連携させる
- * （例: サインイン成功時に Cognito セッションをローカルに保持し、getAuthToken から読む）。
+ * User Pool ID / アプリクライアント ID は Vite 環境変数から読む
+ * （`VITE_COGNITO_USER_POOL_ID` / `VITE_COGNITO_CLIENT_ID`。infra の
+ * `Household-<stage>-Auth` スタックの CfnOutput `UserPoolId` / `UserPoolClientId`）。
+ * まだ AWS にデプロイしていない環境ではこれらは未設定になりうるため、モジュール読み込み時
+ * ではなく実際に呼び出された時点で検証し、フォームの送信エラーとして表示できるようにする
+ * （画面描画自体をクラッシュさせない）。
  *
- * 現状は未確定のバックエンド API に対してサイレントに繋ぎ込まず、フォームのバリデーション/UX
- * だけを確認できるダミー実装にしている。
+ * トークンの保存・更新は `amazon-cognito-identity-js` に任せる: `CognitoUserPool.signUp` /
+ * `CognitoUser.authenticateUser` が成功すると、SDK が自身の判断で `window.localStorage`
+ * （キーは `<clientId>.<username>...` 形式）にトークンを保存する。以後は
+ * `CognitoUserPool.getCurrentUser()` でその最新ユーザーを取得し、`CognitoUser.getSession()`
+ * を呼べば期限切れ時はリフレッシュトークンで自動的に再取得してくれる。
+ * `getAuthToken()`（`src/lib/api.ts`）はこの仕組みの上で ID トークンを取り出すだけにしている。
  */
+import {
+  AuthenticationDetails,
+  CognitoUser,
+  CognitoUserAttribute,
+  CognitoUserPool,
+  type CognitoUserSession,
+} from 'amazon-cognito-identity-js';
 
 export type EmailPasswordCredentials = {
   email: string;
   password: string;
 };
 
-export async function signInWithEmailPassword(_credentials: EmailPasswordCredentials): Promise<void> {
-  throw new Error(
-    'Cognito 連携は未実装です（TODO: signInWithEmailPassword を実装してください）',
-  );
+export type ConfirmSignUpInput = {
+  email: string;
+  code: string;
+};
+
+let cachedUserPool: CognitoUserPool | null = null;
+
+/**
+ * Cognito User Pool クライアントを取得する。環境変数が未設定の場合はここで分かりやすい
+ * エラーを投げる（呼び出し元は全て async 関数なので、呼び出し側の catch でフォームの
+ * エラーメッセージとして表示される）。
+ */
+function getUserPool(): CognitoUserPool {
+  if (cachedUserPool) return cachedUserPool;
+
+  const userPoolId = import.meta.env.VITE_COGNITO_USER_POOL_ID;
+  const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
+  if (!userPoolId || !clientId) {
+    throw new Error(
+      '認証設定が未構成です（VITE_COGNITO_USER_POOL_ID / VITE_COGNITO_CLIENT_ID を設定してください）',
+    );
+  }
+
+  cachedUserPool = new CognitoUserPool({ UserPoolId: userPoolId, ClientId: clientId });
+  return cachedUserPool;
 }
 
-export async function signUpWithEmailPassword(_credentials: EmailPasswordCredentials): Promise<void> {
-  throw new Error(
-    'Cognito 連携は未実装です（TODO: signUpWithEmailPassword を実装してください）',
-  );
+function getCognitoUser(email: string): CognitoUser {
+  return new CognitoUser({ Username: email, Pool: getUserPool() });
+}
+
+/** Cognito の例外オブジェクト（`{ code, message, name }` 形式）から表示用メッセージを取り出す。 */
+function describeCognitoError(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (
+    error &&
+    typeof error === 'object' &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  ) {
+    return (error as { message: string }).message;
+  }
+  return fallback;
+}
+
+/** Cognito `signUp`。デフォルトでメール確認コードの入力が必須のため、成功後は `confirmSignUp` を呼ぶ想定。 */
+export async function signUpWithEmailPassword({ email, password }: EmailPasswordCredentials): Promise<void> {
+  const pool = getUserPool();
+  const attributeList = [new CognitoUserAttribute({ Name: 'email', Value: email })];
+
+  await new Promise<void>((resolve, reject) => {
+    pool.signUp(email, password, attributeList, [], (err) => {
+      if (err) {
+        reject(new Error(describeCognitoError(err, '新規登録に失敗しました')));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+/** サインアップ時にメールで届く確認コードを検証する。成功するとログイン可能になる。 */
+export async function confirmSignUp({ email, code }: ConfirmSignUpInput): Promise<void> {
+  const user = getCognitoUser(email);
+
+  await new Promise<void>((resolve, reject) => {
+    user.confirmRegistration(code, true, (err) => {
+      if (err) {
+        reject(new Error(describeCognitoError(err, '確認コードの検証に失敗しました')));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+/** Cognito `authenticateUser`（SRP 認証）。成功すると SDK がセッションを永続化し、`getAuthToken` から参照できるようになる。 */
+export async function signInWithEmailPassword({ email, password }: EmailPasswordCredentials): Promise<void> {
+  const user = getCognitoUser(email);
+  const authenticationDetails = new AuthenticationDetails({ Username: email, Password: password });
+
+  await new Promise<void>((resolve, reject) => {
+    user.authenticateUser(authenticationDetails, {
+      onSuccess: () => resolve(),
+      onFailure: (err) => reject(new Error(describeCognitoError(err, 'ログインに失敗しました'))),
+      newPasswordRequired: () => {
+        reject(new Error('初回パスワードの変更が必要です。管理者にお問い合わせください。'));
+      },
+    });
+  });
+}
+
+/** ログアウト。ローカルに保存されたセッション情報を破棄する（Cognito 側の失効はしない `signOut`）。 */
+export function signOut(): void {
+  try {
+    getUserPool().getCurrentUser()?.signOut();
+  } catch {
+    // 環境変数未設定など、そもそもログインしようがない状態では何もしない
+  }
+}
+
+/**
+ * 現在の Cognito セッションを取得する。ログインしていない・環境変数未設定・トークン失効かつ
+ * リフレッシュ不可の場合は `null` を返す（例外は投げない）。ルート保護や `getAuthToken` から使う。
+ */
+export async function getCurrentSession(): Promise<CognitoUserSession | null> {
+  let pool: CognitoUserPool;
+  try {
+    pool = getUserPool();
+  } catch {
+    return null;
+  }
+
+  const user = pool.getCurrentUser();
+  if (!user) return null;
+
+  return new Promise((resolve) => {
+    user.getSession((err: Error | null, session: CognitoUserSession | null) => {
+      if (err || !session || !session.isValid()) {
+        resolve(null);
+        return;
+      }
+      resolve(session);
+    });
+  });
 }
 
 /** 退会申請。CLAUDE.md 方針: 論理削除→30日程度の猶予後にバッチで物理削除。 */

@@ -1,17 +1,18 @@
 /**
  * 型付き API クライアント。
  *
- * バックエンド (API Gateway HTTP API + Lambda) 未実装のため、ここではベース URL の解決・
- * 認証トークンの付与・エラーハンドリングの「型」だけを定義する。実データは各ページで
- * `src/lib/local-store.ts` のローカル（localStorage）実装をモックとして使っている。
- * バックエンドが用意でき次第、`local-store.ts` の呼び出し箇所を `apiFetch` ベースの
- * 関数に差し替える想定。
+ * ベース URL の解決・認証トークンの付与・エラー正規化を担う薄い fetch ラッパー。
+ * `/categories` は apps/backend に実装済みのため `src/lib/categories.ts` がこの
+ * `apiFetch` を使って呼び出す。取引・予算・集計系はバックエンドが未実装（501 スタブ）
+ * のため、各ページは引き続き `src/lib/local-store.ts` のローカル（localStorage）実装を
+ * 使っている。バックエンドが用意でき次第、対応するエンドポイントをここに追記して
+ * `local-store.ts` の呼び出し箇所を `apiFetch` ベースの関数に差し替える想定。
  *
  * エンドポイント形状（apps/backend の実装・infra の CDK ルーティングと確認済み）:
- *   GET    /categories
- *   POST   /categories
- *   PUT    /categories/:id
- *   DELETE /categories/:id
+ *   GET    /categories                                    (実装済み)
+ *   POST   /categories                                    (実装済み)
+ *   PUT    /categories/:id                                (実装済み)
+ *   DELETE /categories/:id                                (実装済み)
  *   GET    /transactions?from=YYYY-MM-DD&to=YYYY-MM-DD   (スタブ)
  *   POST   /transactions                                  (スタブ)
  *   PUT    /transactions/:id                               (スタブ)
@@ -23,14 +24,15 @@
  *   GET    /aggregation/budget-variance?yearMonth=YYYY-MM                  (スタブ)
  *
  * ログイン/サインアップはこの API を経由しない。CLAUDE.md の設計どおり Cognito User Pool
- * に対して直接（Cognito Hosted UI ではなく SDK 経由で）認証するため、`src/lib/auth.ts` から
- * 別途 Cognito Identity Provider を叩く実装に差し替える（このファイルでは扱わない）。
+ * に対して直接（Cognito Hosted UI ではなく `amazon-cognito-identity-js` SDK 経由で）認証する
+ * （`src/lib/auth.ts`）。
  *
  * 退会（アカウント論理削除→30日後物理削除）は Cognito だけでは完結せず DynamoDB 側の状態
  * 変更が必要になるため、本来はこの API に `POST /users/me/withdraw` 相当のエンドポイントが
  * 要る。apps/backend にはまだ実装もスタブも存在しない — 今回のスキャフォールディングの
  * スコープ外として積み残し。着手時に backend 側へハンドラを追加すること。
  */
+import { getCurrentSession } from './auth';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
@@ -47,15 +49,14 @@ export class ApiError extends Error {
 }
 
 /**
- * Cognito 連携のスタブ。
- *
- * TODO(backend/auth): Amazon Cognito User Pool 連携を実装したら、ここを
- * `amazon-cognito-identity-js` または AWS Amplify Auth の `fetchAuthSession()` 等に
- * 差し替え、有効な ID トークン（またはアクセストークン）を返すようにする。
- * 現状は未ログイン扱いとして常に null を返す。
+ * 現在の Cognito セッションから ID トークンを取得する。`src/lib/auth.ts` の
+ * `getCurrentSession()` がセッションの有効性確認・期限切れ時のリフレッシュを担う。
+ * 未ログイン（または Cognito 環境変数未設定）の場合は `null` を返す。
  */
 export async function getAuthToken(): Promise<string | null> {
-  return null;
+  const session = await getCurrentSession();
+  if (!session) return null;
+  return session.getIdToken().getJwtToken();
 }
 
 export type ApiFetchOptions = Omit<RequestInit, 'body'> & {

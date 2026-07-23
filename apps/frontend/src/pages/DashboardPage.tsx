@@ -8,7 +8,8 @@ import { TrendChart } from '@/components/charts/TrendChart';
 import { AssetFormationChart } from '@/components/charts/AssetFormationChart';
 import { BudgetVarianceList } from '@/components/charts/BudgetVarianceList';
 import { computeAssetFormationTrend, computeBudgetVariance, computeTrend } from '@/lib/aggregate';
-import { getBudgets, getCategories, getTransactions } from '@/lib/local-store';
+import { getCategories } from '@/lib/categories';
+import { getBudgets, getTransactions } from '@/lib/local-store';
 import { EMPTY_ARRAY } from '@/lib/utils';
 
 const GRANULARITY_LABEL: Record<TrendGranularity, string> = {
@@ -24,7 +25,7 @@ function currentYearMonth(): string {
 export default function DashboardPage() {
   const [granularity, setGranularity] = useState<TrendGranularity>('day');
 
-  // TODO(backend): GET /transactions, GET /categories, GET /budgets に差し替え
+  // TODO(backend): GET /transactions, GET /budgets に差し替え（GET /categories は実装済みのため src/lib/categories.ts 経由）
   const transactionsQuery = useQuery({ queryKey: ['transactions'], queryFn: async () => getTransactions() });
   const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: async () => getCategories() });
   const budgetsQuery = useQuery({ queryKey: ['budgets'], queryFn: async () => getBudgets() });

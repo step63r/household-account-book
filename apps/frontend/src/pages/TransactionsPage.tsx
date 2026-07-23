@@ -29,7 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { createTransaction, deleteTransaction, getCategories, getTransactions } from '@/lib/local-store';
+import { getCategories } from '@/lib/categories';
+import { createTransaction, deleteTransaction, getTransactions } from '@/lib/local-store';
 import { EMPTY_ARRAY } from '@/lib/utils';
 
 const TYPE_LABEL: Record<TransactionType, string> = {
@@ -57,7 +58,7 @@ function today(): string {
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
 
-  // TODO(backend): GET /transactions, GET /categories に差し替え
+  // TODO(backend): GET /transactions に差し替え（GET /categories は実装済みのため src/lib/categories.ts 経由）
   const transactionsQuery = useQuery({ queryKey: ['transactions'], queryFn: async () => getTransactions() });
   const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: async () => getCategories() });
   const transactions = transactionsQuery.data ?? EMPTY_ARRAY;

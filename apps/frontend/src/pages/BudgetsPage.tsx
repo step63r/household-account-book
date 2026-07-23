@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { getBudgets, getCategories, upsertBudget } from '@/lib/local-store';
+import { getCategories } from '@/lib/categories';
+import { getBudgets, upsertBudget } from '@/lib/local-store';
 
 function currentYearMonth(): string {
   return new Date().toISOString().slice(0, 7);
@@ -19,7 +20,7 @@ export default function BudgetsPage() {
   const queryClient = useQueryClient();
   const [yearMonth, setYearMonth] = useState(currentYearMonth());
 
-  // TODO(backend): GET /categories, GET /budgets?yearMonth=... に差し替え
+  // TODO(backend): GET /budgets?yearMonth=... に差し替え（GET /categories は実装済みのため src/lib/categories.ts 経由）
   const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: async () => getCategories() });
   const budgetsQuery = useQuery({ queryKey: ['budgets'], queryFn: async () => getBudgets() });
   const categories = useMemo(

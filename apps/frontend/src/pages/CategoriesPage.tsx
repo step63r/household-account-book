@@ -36,7 +36,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { createCategory, deleteCategory, getCategories, updateCategory } from '@/lib/local-store';
+import { createCategory, deleteCategory, getCategories, updateCategory } from '@/lib/categories';
 import { EMPTY_ARRAY } from '@/lib/utils';
 
 export default function CategoriesPage() {
@@ -58,7 +58,6 @@ export default function CategoriesPage() {
   });
 
   const upsertMutation = useMutation({
-    // TODO(backend): POST /categories または PUT /categories/:id に差し替え
     mutationFn: async ({ id, input }: { id: string | null; input: CreateCategoryInput }) =>
       id ? updateCategory(id, input) : createCategory(input),
     onSuccess: () => {
@@ -68,7 +67,6 @@ export default function CategoriesPage() {
   });
 
   const deleteMutation = useMutation({
-    // TODO(backend): DELETE /categories/:id に差し替え
     mutationFn: async (id: string) => deleteCategory(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['categories'] });

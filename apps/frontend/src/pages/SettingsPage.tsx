@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, LogOut } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -20,11 +21,26 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { requestAccountWithdrawal } from '@/lib/auth';
+import { getCurrentSession, requestAccountWithdrawal, signOut } from '@/lib/auth';
 
 export default function SettingsPage() {
+  const navigate = useNavigate();
   const [withdrawalError, setWithdrawalError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // ID トークンの email クレームから表示する（GET /users/me 相当のバックエンドAPIはまだ無い）
+  const [email, setEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCurrentSession().then((session) => {
+      if (cancelled || !session) return;
+      const claim = session.getIdToken().payload.email;
+      if (typeof claim === 'string') setEmail(claim);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleWithdraw() {
     setIsSubmitting(true);
@@ -36,6 +52,11 @@ export default function SettingsPage() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function handleSignOut() {
+    signOut();
+    navigate('/login', { replace: true });
   }
 
   return (
@@ -53,14 +74,19 @@ export default function SettingsPage() {
         <CardContent className="flex flex-col gap-2 text-sm">
           <div className="flex items-center justify-between border-b border-border py-2">
             <span className="text-muted-foreground">メールアドレス</span>
-            {/* TODO(backend/auth): Cognito 連携後、実際のログインユーザー情報（GET /users/me）に差し替える */}
-            <span className="font-medium">未ログイン</span>
+            <span className="font-medium">{email ?? '未ログイン'}</span>
           </div>
           <div className="flex items-center justify-between py-2">
             <span className="text-muted-foreground">ステータス</span>
             <span className="font-medium">active</span>
           </div>
         </CardContent>
+        <CardFooter>
+          <Button type="button" variant="outline" onClick={handleSignOut}>
+            <LogOut className="size-4" />
+            ログアウト
+          </Button>
+        </CardFooter>
       </Card>
 
       <Card className="border-destructive/40">

@@ -9,6 +9,13 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // `amazon-cognito-identity-js` (and its crypto dependencies) reference the Node.js
+  // global `global` at module load time. Unlike webpack, Vite doesn't polyfill this in
+  // the browser, so without this define every page crashes on load with
+  // `ReferenceError: global is not defined` as soon as src/lib/auth.ts is imported.
+  define: {
+    global: 'globalThis',
+  },
   resolve: {
     alias: {
       '@': path.resolve(dirname, './src'),
