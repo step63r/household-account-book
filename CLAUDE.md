@@ -66,7 +66,7 @@ pnpmワークスペース（`pnpm-workspace.yaml`）。ルート`package.json`�
 - `pnpm --filter @household/frontend dev` — フロントエンド開発サーバー起動（Vite）
 - `pnpm --filter @household/backend test` — バックエンドのユニットテスト（vitest、AWSには接続しない）
 - `cd infra && pnpm exec cdk synth` / `cdk diff` — CDKの構文検証・差分確認（副作用なし、ローカルで安全に実行可）
-- `cdk deploy` は実AWSへの課金・破壊的操作を伴うため、`infra-cdk`エージェント/CLAUDE.mdの方針どおり、実行前に必ずユーザーへ確認すること（このリポジトリではまだ一度もdeployしていない）
+- `cdk deploy` は実AWSへの課金・破壊的操作を伴うため、`infra-cdk`エージェント/CLAUDE.mdの方針どおり、実行前に必ずユーザーへ確認すること（2026-07-24にdev環境へ初回deploy済み。このAWSアカウントには本プロジェクト以外のCDK/SAMスタックも存在するため、`CDKToolkit`ブートストラップスタックなどアカウント共有リソースに触れる操作は特に慎重に）
 
 ## 実装状況
 
@@ -77,6 +77,6 @@ pnpmワークスペース（`pnpm-workspace.yaml`）。ルート`package.json`�
   - ダッシュボードの集計（収支推移・資産形成推移・予実差）は`src/lib/aggregate.ts`によるクライアント側計算のまま。バックエンドの`/aggregation/*`エンドポイントは実装済みだがフロントからはまだ未使用（既知の積み残し。切り替える場合は取引・予算の全件取得をやめてこのエンドポイントを叩く形に変更する）
   - 認証: `amazon-cognito-identity-js`でCognito User Poolに直接連携（サインアップ→確認コード→ログイン→ログアウト）を実装済み（`src/lib/auth.ts`）。バックエンドを経由しない設計（`/auth/*`エンドポイントは存在しない、CLAUDE.mdの方針どおり）。退会だけは例外的にバックエンドAPI（`POST /users/me/withdraw`）を叩く（`src/lib/account.ts`。`auth.ts`に置くと`api.ts`との循環importになるため分離）
   - ルート保護実装済み（未ログイン時はDashboard等から`/login`へリダイレクト、`src/components/auth/RequireAuth.tsx`）
-  - 追加env: `VITE_COGNITO_USER_POOL_ID` / `VITE_COGNITO_CLIENT_ID`（`Household-<stage>-Auth`スタックの出力値。`.env.example`参照）
-  - **未デプロイのため未検証**: 実際のAPI疎通はCognito User Pool・API Gatewayをデプロイして初めて確認できる。env未設定時は「認証設定が未構成です」と表示し、クラッシュしないことのみ確認済み
-- インフラ: 5スタック（Auth/Data/Api/Hosting/Monitoring）で`cdk synth`確認済み。**まだAWSへ一度もdeployしていない**。Amplify HostingのGitHub連携とアラート通知先メールはコンテキストパラメータのプレースホルダーのみ（`amplifyGithubRepoUrl`, `amplifyGithubTokenSecretName`, `alertEmail`）
+  - 追加env: `VITE_COGNITO_USER_POOL_ID` / `VITE_COGNITO_CLIENT_ID` / `VITE_API_BASE_URL`（`Household-dev-Auth`/`Household-dev-Api`スタックの出力値。`apps/frontend/.env`に設定済み、gitignore対象）
+  - dev環境の実APIに対して`GET /categories`が認証なしで401を返すことを確認済み（疎通そのものはOK）。実際のサインアップ〜ログイン〜画面操作のブラウザでの動作確認はまだ行っていない
+- インフラ: 5スタック（Auth/Data/Api/Hosting/Monitoring）を2026-07-24にdev環境へ初回deploy済み（`Household-dev-*`、リージョン`ap-northeast-1`、アカウント`966191971257`）。API Gatewayエンドポイントは`Household-dev-Api`スタックの`ApiEndpoint`出力を参照。Amplify HostingのGitHub連携とアラート通知先メールはコンテキストパラメータのプレースホルダーのまま（`amplifyGithubRepoUrl`, `amplifyGithubTokenSecretName`, `alertEmail`が空のため、Amplifyアプリ自体は作成済みだがビルド用ブランチは無し）。prodへは未deploy
