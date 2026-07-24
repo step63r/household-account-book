@@ -102,7 +102,9 @@ export default function TransactionsPage() {
     });
   });
 
-  const sortedTransactions = [...transactions].sort((a, b) => b.date.localeCompare(a.date));
+  const sortedTransactions = [...transactions].sort(
+    (a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt),
+  );
 
   return (
     <div className="flex flex-col gap-6">
