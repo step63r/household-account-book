@@ -46,6 +46,9 @@ new HostingStack(app, `${stackNamePrefix}-Hosting`, {
   env,
   githubRepoUrl: amplifyGithubRepoUrl,
   githubTokenSecretName: amplifyGithubTokenSecretName,
+  userPoolId: authStack.userPool.userPoolId,
+  userPoolClientId: authStack.userPoolClient.userPoolClientId,
+  apiEndpoint: apiStack.httpApi.apiEndpoint,
 });
 
 new MonitoringStack(app, `${stackNamePrefix}-Monitoring`, {

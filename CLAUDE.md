@@ -79,4 +79,9 @@ pnpmワークスペース（`pnpm-workspace.yaml`）。ルート`package.json`�
   - ルート保護実装済み（未ログイン時はDashboard等から`/login`へリダイレクト、`src/components/auth/RequireAuth.tsx`）
   - 追加env: `VITE_COGNITO_USER_POOL_ID` / `VITE_COGNITO_CLIENT_ID` / `VITE_API_BASE_URL`（`Household-dev-Auth`/`Household-dev-Api`スタックの出力値。`apps/frontend/.env`に設定済み、gitignore対象）
   - dev環境の実APIに対して`GET /categories`が認証なしで401を返すことを確認済み（疎通そのものはOK）。実際のサインアップ〜ログイン〜画面操作のブラウザでの動作確認はまだ行っていない
-- インフラ: 5スタック（Auth/Data/Api/Hosting/Monitoring）を2026-07-24にdev環境へ初回deploy済み（`Household-dev-*`、リージョン`ap-northeast-1`、アカウント`966191971257`）。API Gatewayエンドポイントは`Household-dev-Api`スタックの`ApiEndpoint`出力を参照。Amplify HostingのGitHub連携とアラート通知先メールはコンテキストパラメータのプレースホルダーのまま（`amplifyGithubRepoUrl`, `amplifyGithubTokenSecretName`, `alertEmail`が空のため、Amplifyアプリ自体は作成済みだがビルド用ブランチは無し）。prodへは未deploy
+- インフラ: 5スタック（Auth/Data/Api/Hosting/Monitoring）を2026-07-24にdev環境へ初回deploy済み（`Household-dev-*`、リージョン`ap-northeast-1`、アカウント`966191971257`）。API Gatewayエンドポイントは`Household-dev-Api`スタックの`ApiEndpoint`出力を参照
+  - Amplify HostingはGitHub連携済み（`infra/cdk.json`の`amplifyGithubRepoUrl`/`amplifyGithubTokenSecretName`を設定してデプロイ）。ブランチ名は`master`（このリポジトリの実際のデフォルトブランチ。`infra/lib/hosting-stack.ts`のCDK addBranchは元`main`とハードコードされておりビルド失敗の原因になっていたため修正済み）
+  - Amplifyのビルド環境変数（`VITE_API_BASE_URL`/`VITE_COGNITO_USER_POOL_ID`/`VITE_COGNITO_CLIENT_ID`）は`infra/lib/hosting-stack.ts`の`amplify.App`の`environmentVariables`でAuth/Apiスタックからクロススタック参照して注入（`bin/app.ts`でHostingStackにuserPoolId/userPoolClientId/apiEndpointを渡す構成。開発者ローカルの`.env`はgitignore対象でCodeBuild環境には見えないため、ここで明示的に渡さないとフロントが「認証設定が未構成です」のまま本番ビルドされる — 実際にこれで一度ハマって修正した）
+  - 動作確認用に手動ビルド（`aws amplify start-job`）を実行しSUCCEED、`https://master.dq8qcdd07g8u.amplifyapp.com/`のJSバンドルに実際のUser Pool IDが埋め込まれていることまで確認済み。以後はmasterへのpushで自動ビルド。実ブラウザでのサインアップ〜ログイン操作自体はまだ未検証
+  - アラート通知先メール（`alertEmail`）は未設定のまま（コンテキストパラメータが空文字）
+  - prodへは未deploy

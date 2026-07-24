@@ -101,6 +101,7 @@
     "@aws-cdk/s3-notifications:addS3TrustKeyPolicyForSnsSubscriptions": true,
     "stage": "dev",
     "alertEmail": "",
-    "amplifyGithubRepoUrl": ""
+    "amplifyGithubRepoUrl": "https://github.com/step63r/household-account-book",
+    "amplifyGithubTokenSecretName": "household-dev-amplify-github-token"
   }
 }

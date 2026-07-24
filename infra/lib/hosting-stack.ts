@@ -17,6 +17,12 @@ export interface HostingStackProps extends cdk.StackProps {
    * `-c amplifyGithubTokenSecretName=...` once the secret exists.
    */
   readonly githubTokenSecretName?: string;
+  /** Baked into the frontend build as VITE_COGNITO_USER_POOL_ID (see apps/frontend/.env.example). */
+  readonly userPoolId: string;
+  /** Baked into the frontend build as VITE_COGNITO_CLIENT_ID. */
+  readonly userPoolClientId: string;
+  /** Baked into the frontend build as VITE_API_BASE_URL. */
+  readonly apiEndpoint: string;
 }
 
 /**
@@ -43,6 +49,14 @@ export class HostingStack extends cdk.Stack {
       appName: `household-${props.stage}-frontend`,
       sourceCodeProvider,
       platform: amplify.Platform.WEB,
+      // Vite only inlines VITE_* vars that are present in the build environment - CodeBuild
+      // doesn't see the developer's local apps/frontend/.env (gitignored, never in the repo),
+      // so these must be injected here for the production build to pick them up.
+      environmentVariables: {
+        VITE_API_BASE_URL: props.apiEndpoint,
+        VITE_COGNITO_USER_POOL_ID: props.userPoolId,
+        VITE_COGNITO_CLIENT_ID: props.userPoolClientId,
+      },
       buildSpec: codebuild.BuildSpec.fromObjectToYaml({
         version: 1,
         applications: [
@@ -71,9 +85,10 @@ export class HostingStack extends cdk.Stack {
     });
 
     // Only add a deployable branch once there's an actual repo connected - an auto-created
-    // branch with no source provider can't build anything.
+    // branch with no source provider can't build anything. Branch name is "master", not the
+    // more common "main" - that's this repo's actual default branch (git remote has no "main").
     if (sourceCodeProvider) {
-      this.app.addBranch('main', { stage: props.stage === 'prod' ? 'PRODUCTION' : 'DEVELOPMENT' });
+      this.app.addBranch('master', { stage: props.stage === 'prod' ? 'PRODUCTION' : 'DEVELOPMENT' });
     }
   }
 
