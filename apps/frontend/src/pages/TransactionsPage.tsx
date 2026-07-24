@@ -2,10 +2,11 @@ import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import {
   createTransactionInputSchema,
   type CreateTransactionInput,
+  type Transaction,
   type TransactionType,
 } from '@household/shared';
 
@@ -30,7 +31,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { getCategories } from '@/lib/categories';
-import { createTransaction, deleteTransaction, getTransactions } from '@/lib/transactions';
+import {
+  createTransaction,
+  deleteTransaction,
+  getTransactions,
+  updateTransaction,
+} from '@/lib/transactions';
 import { EMPTY_ARRAY } from '@/lib/utils';
 
 const TYPE_LABEL: Record<TransactionType, string> = {
@@ -64,11 +70,31 @@ export default function TransactionsPage() {
   const categories = categoriesQuery.data ?? EMPTY_ARRAY;
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   const createMutation = useMutation({
     mutationFn: async (input: CreateTransactionInput) => createTransaction(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
       form.reset({ ...form.getValues(), amount: 0, memo: '' });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, input }: { id: string; input: CreateTransactionInput }) =>
+      updateTransaction(id, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      setEditingId(null);
+      form.reset({
+        date: today(),
+        type: 'expense',
+        categoryId: null,
+        amount: 0,
+        memo: '',
+        transferLabel: '',
+      });
+      setTypeValue('expense');
     },
   });
 
@@ -93,13 +119,44 @@ export default function TransactionsPage() {
 
   const [typeValue, setTypeValue] = useState<TransactionType>('expense');
 
+  const startEdit = (tx: Transaction) => {
+    setEditingId(tx.id);
+    setTypeValue(tx.type);
+    form.reset({
+      date: tx.date,
+      type: tx.type,
+      categoryId: tx.categoryId,
+      amount: tx.amount,
+      memo: tx.memo ?? '',
+      transferLabel: tx.transferLabel ?? '',
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    form.reset({
+      date: today(),
+      type: 'expense',
+      categoryId: null,
+      amount: 0,
+      memo: '',
+      transferLabel: '',
+    });
+    setTypeValue('expense');
+  };
+
   const onSubmit = form.handleSubmit((values) => {
-    createMutation.mutate({
+    const input: CreateTransactionInput = {
       ...values,
       categoryId: values.type === 'transfer' ? null : values.categoryId,
       memo: values.memo || undefined,
       transferLabel: values.type === 'transfer' ? values.transferLabel || undefined : undefined,
-    });
+    };
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, input });
+    } else {
+      createMutation.mutate(input);
+    }
   });
 
   const sortedTransactions = [...transactions].sort(
@@ -115,7 +172,7 @@ export default function TransactionsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>取引を追加</CardTitle>
+          <CardTitle>{editingId ? '取引を編集' : '取引を追加'}</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -238,10 +295,19 @@ export default function TransactionsPage() {
                 )}
               />
 
-              <div className="flex items-end">
-                <Button type="submit" disabled={createMutation.isPending} className="w-full">
-                  追加する
+              <div className="flex items-end gap-2">
+                <Button
+                  type="submit"
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                  className="w-full"
+                >
+                  {editingId ? '更新する' : '追加する'}
                 </Button>
+                {editingId ? (
+                  <Button type="button" variant="outline" onClick={cancelEdit}>
+                    キャンセル
+                  </Button>
+                ) : null}
               </div>
             </form>
           </Form>
@@ -284,7 +350,16 @@ export default function TransactionsPage() {
                         {yenFormatter.format(tx.amount)}
                       </td>
                       <td className="py-2 pr-3 text-muted-foreground">{tx.memo ?? ''}</td>
-                      <td className="py-2 text-right">
+                      <td className="py-2 text-right whitespace-nowrap">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label="編集"
+                          onClick={() => startEdit(tx)}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
                         <Button
                           type="button"
                           variant="ghost"
