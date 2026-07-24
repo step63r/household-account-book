@@ -19,8 +19,10 @@ const GRANULARITY_LABEL: Record<TrendGranularity, string> = {
   month: '月次',
 };
 
+/** 日本時間の当月（YYYY-MM）。toISOString()はUTC基準になるため使わない
+ * （月初〜朝9時のUTC日付が前月にずれる）。 */
 function currentYearMonth(): string {
-  return new Date().toISOString().slice(0, 7);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date()).slice(0, 7);
 }
 
 export default function DashboardPage() {

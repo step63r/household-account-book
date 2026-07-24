@@ -58,8 +58,10 @@ const yenFormatter = new Intl.NumberFormat('ja-JP', {
   maximumFractionDigits: 0,
 });
 
+/** 日本時間の本日日付（YYYY-MM-DD）。toISOString()はUTC基準になるため使わない
+ * （深夜0〜9時のUTC日付が前日にずれる）。 */
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date());
 }
 
 /** 収入源Selectで「その他（自由入力）」を表す番兵値。incomeSourceの値としては保存しない。 */
