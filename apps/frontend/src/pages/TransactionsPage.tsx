@@ -65,10 +65,8 @@ function today(): string {
 /** 収入源Selectで「その他（自由入力）」を表す番兵値。incomeSourceの値としては保存しない。 */
 const CUSTOM_INCOME_SOURCE = '__custom__';
 
-function incomeSourceSelectValue(incomeSource: string): string {
-  return (INCOME_SOURCE_PRESETS as readonly string[]).includes(incomeSource)
-    ? incomeSource
-    : CUSTOM_INCOME_SOURCE;
+function isCustomIncomeSource(incomeSource: string): boolean {
+  return incomeSource !== '' && !(INCOME_SOURCE_PRESETS as readonly string[]).includes(incomeSource);
 }
 
 export default function TransactionsPage() {
@@ -106,6 +104,7 @@ export default function TransactionsPage() {
         incomeSource: '',
       });
       setTypeValue('expense');
+      setCustomIncomeSource(false);
     },
   });
 
@@ -130,10 +129,12 @@ export default function TransactionsPage() {
   });
 
   const [typeValue, setTypeValue] = useState<TransactionType>('expense');
+  const [customIncomeSource, setCustomIncomeSource] = useState(false);
 
   const startEdit = (tx: Transaction) => {
     setEditingId(tx.id);
     setTypeValue(tx.type);
+    setCustomIncomeSource(isCustomIncomeSource(tx.incomeSource ?? ''));
     form.reset({
       date: tx.date,
       type: tx.type,
@@ -157,6 +158,7 @@ export default function TransactionsPage() {
       incomeSource: '',
     });
     setTypeValue('expense');
+    setCustomIncomeSource(false);
   };
 
   const onSubmit = form.handleSubmit((values) => {
@@ -254,13 +256,21 @@ export default function TransactionsPage() {
                   control={form.control}
                   name="incomeSource"
                   render={({ field }) => {
-                    const selectValue = field.value ? incomeSourceSelectValue(field.value) : undefined;
+                    const selectValue = customIncomeSource ? CUSTOM_INCOME_SOURCE : field.value || undefined;
                     return (
                       <FormItem>
                         <FormLabel>収入源</FormLabel>
                         <Select
                           value={selectValue}
-                          onValueChange={(v) => field.onChange(v === CUSTOM_INCOME_SOURCE ? '' : v)}
+                          onValueChange={(v) => {
+                            if (v === CUSTOM_INCOME_SOURCE) {
+                              setCustomIncomeSource(true);
+                              field.onChange('');
+                            } else {
+                              setCustomIncomeSource(false);
+                              field.onChange(v);
+                            }
+                          }}
                         >
                           <FormControl>
                             <SelectTrigger className="w-full">
@@ -276,7 +286,7 @@ export default function TransactionsPage() {
                             <SelectItem value={CUSTOM_INCOME_SOURCE}>その他（自由入力）</SelectItem>
                           </SelectContent>
                         </Select>
-                        {selectValue === CUSTOM_INCOME_SOURCE ? (
+                        {customIncomeSource ? (
                           <FormControl>
                             <Input placeholder="収入源を入力" {...field} value={field.value ?? ''} className="mt-2" />
                           </FormControl>
