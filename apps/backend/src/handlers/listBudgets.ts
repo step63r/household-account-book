@@ -2,18 +2,17 @@ import type { APIGatewayProxyHandlerV2WithJWTAuthorizer } from 'aws-lambda';
 import { requireUserId } from '../lib/auth';
 import { handleError } from '../lib/errors';
 import { jsonResponse } from '../lib/response';
+import { DynamoBudgetRepository } from '../repository/budgetRepository';
+import { listBudgets } from '../services/budgetService';
 
-/**
- * GET /budgets?yearMonth=YYYY-MM
- * TODO: implement.
- * - Validate `yearMonth` query param with yearMonthSchema from @household/shared.
- * - Query BUDGET#<yyyymm>#<categoryId> items via begins_with(SK, 'BUDGET#<yyyymm>#').
- * - Response items should validate against budgetSchema from @household/shared.
- */
+const repository = new DynamoBudgetRepository();
+
+/** GET /budgets?yearMonth=YYYY-MM - list the caller's budgets for a month. */
 export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
   try {
-    requireUserId(event);
-    return jsonResponse(501, { message: 'Not implemented' });
+    const userId = requireUserId(event);
+    const budgets = await listBudgets(repository, userId, event.queryStringParameters?.yearMonth);
+    return jsonResponse(200, budgets);
   } catch (error) {
     return handleError(error);
   }

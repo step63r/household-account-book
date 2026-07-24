@@ -2,23 +2,20 @@ import type { APIGatewayProxyHandlerV2WithJWTAuthorizer } from 'aws-lambda';
 import { requireUserId } from '../lib/auth';
 import { handleError } from '../lib/errors';
 import { jsonResponse } from '../lib/response';
+import { DynamoTransactionRepository } from '../repository/transactionRepository';
+import { getTrend } from '../services/aggregationService';
+
+const transactionRepository = new DynamoTransactionRepository();
 
 /**
  * GET /aggregation/trend?granularity=day|week|month&from=YYYY-MM-DD&to=YYYY-MM-DD
- * TODO: implement.
- * - Validate `granularity` with trendGranularitySchema from @household/shared.
- * - Query TXN# items for the caller in the [from, to] date range (sort-key range on
- *   TXN#<date>#<txnId>, never Scan), then bucket + sum in Lambda memory per CLAUDE.md's
- *   "aggregate in Lambda, not in DynamoDB" policy.
- * - MUST exclude type=transfer transactions from income/expense sums (CLAUDE.md: transfer
- *   feeds a separate 資産形成推移 aggregation, not this one).
- * - Response should be TrendPoint[] from @household/shared (aggregation.ts); period format
- *   depends on granularity: 'YYYY-MM-DD' / 'YYYY-Www' / 'YYYY-MM'.
+ * transfer を除外した収支推移。日/週/月粒度でLambda側インメモリ集計する。
  */
 export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
   try {
-    requireUserId(event);
-    return jsonResponse(501, { message: 'Not implemented' });
+    const userId = requireUserId(event);
+    const trend = await getTrend(transactionRepository, userId, event.queryStringParameters);
+    return jsonResponse(200, trend);
   } catch (error) {
     return handleError(error);
   }
