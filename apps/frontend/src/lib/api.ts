@@ -2,35 +2,31 @@
  * 型付き API クライアント。
  *
  * ベース URL の解決・認証トークンの付与・エラー正規化を担う薄い fetch ラッパー。
- * `/categories` は apps/backend に実装済みのため `src/lib/categories.ts` がこの
- * `apiFetch` を使って呼び出す。取引・予算・集計系はバックエンドが未実装（501 スタブ）
- * のため、各ページは引き続き `src/lib/local-store.ts` のローカル（localStorage）実装を
- * 使っている。バックエンドが用意でき次第、対応するエンドポイントをここに追記して
- * `local-store.ts` の呼び出し箇所を `apiFetch` ベースの関数に差し替える想定。
+ * 各リソースは `src/lib/categories.ts` / `transactions.ts` / `budgets.ts` / `account.ts`
+ * がこの `apiFetch` を使って apps/backend を呼び出す（集計エンドポイントはまだフロントから
+ * 呼んでいない — `DashboardPage.tsx` は引き続き `src/lib/aggregate.ts` でクライアント側集計）。
  *
- * エンドポイント形状（apps/backend の実装・infra の CDK ルーティングと確認済み）:
- *   GET    /categories                                    (実装済み)
- *   POST   /categories                                    (実装済み)
- *   PUT    /categories/:id                                (実装済み)
- *   DELETE /categories/:id                                (実装済み)
- *   GET    /transactions?from=YYYY-MM-DD&to=YYYY-MM-DD   (スタブ)
- *   POST   /transactions                                  (スタブ)
- *   PUT    /transactions/:id                               (スタブ)
- *   DELETE /transactions/:id                               (スタブ)
- *   GET    /budgets?yearMonth=YYYY-MM                      (スタブ)
- *   PUT    /budgets  (upsert, body: UpsertBudgetInput)     (スタブ)
- *   GET    /aggregation/trend?granularity=day|week|month&from=...&to=...   (スタブ)
- *   GET    /aggregation/category-pivot?from=...&to=...                     (スタブ)
- *   GET    /aggregation/budget-variance?yearMonth=YYYY-MM                  (スタブ)
+ * エンドポイント形状（apps/backend の実装・infra の CDK ルーティングと確認済み、すべて実装済み）:
+ *   GET    /categories                                    src/lib/categories.ts
+ *   POST   /categories
+ *   PUT    /categories/:id
+ *   DELETE /categories/:id
+ *   GET    /transactions?from=YYYY-MM-DD&to=YYYY-MM-DD   src/lib/transactions.ts
+ *   POST   /transactions
+ *   PUT    /transactions/:id
+ *   DELETE /transactions/:id
+ *   GET    /budgets?yearMonth=YYYY-MM                      src/lib/budgets.ts
+ *   PUT    /budgets  (upsert, body: UpsertBudgetInput)
+ *   GET    /aggregation/trend?granularity=day|week|month&from=...&to=...   (未使用)
+ *   GET    /aggregation/category-pivot?from=...&to=...                     (未使用)
+ *   GET    /aggregation/budget-variance?yearMonth=YYYY-MM                  (未使用)
+ *   POST   /users/me/withdraw                               src/lib/account.ts
  *
  * ログイン/サインアップはこの API を経由しない。CLAUDE.md の設計どおり Cognito User Pool
  * に対して直接（Cognito Hosted UI ではなく `amazon-cognito-identity-js` SDK 経由で）認証する
- * （`src/lib/auth.ts`）。
- *
- * 退会（アカウント論理削除→30日後物理削除）は Cognito だけでは完結せず DynamoDB 側の状態
- * 変更が必要になるため、本来はこの API に `POST /users/me/withdraw` 相当のエンドポイントが
- * 要る。apps/backend にはまだ実装もスタブも存在しない — 今回のスキャフォールディングの
- * スコープ外として積み残し。着手時に backend 側へハンドラを追加すること。
+ * （`src/lib/auth.ts`）。退会だけは DynamoDB 側の状態変更が必要なため例外的にこの API を叩く
+ * （`src/lib/account.ts`。`auth.ts` に置くと `getAuthToken` がその `auth.ts` を参照する関係で
+ * 循環importになるため分離している）。
  */
 import { getCurrentSession } from './auth';
 

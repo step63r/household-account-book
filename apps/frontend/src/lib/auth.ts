@@ -158,10 +158,3 @@ export async function getCurrentSession(): Promise<CognitoUserSession | null> {
     });
   });
 }
-
-/** 退会申請。CLAUDE.md 方針: 論理削除→30日程度の猶予後にバッチで物理削除。 */
-export async function requestAccountWithdrawal(): Promise<void> {
-  throw new Error(
-    '退会APIは未実装です（TODO: POST /users/me/withdraw 相当のエンドポイントに接続してください）',
-  );
-}

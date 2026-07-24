@@ -73,10 +73,10 @@ pnpmワークスペース（`pnpm-workspace.yaml`）。ルート`package.json`�
 - バックエンド: 費目（カテゴリ）・取引・予算・集計（推移/費目別ピボット/予実差）のCRUD・集計エンドポイントを実装済み（DynamoDB連携・監査ログ込み、`pnpm --filter @household/backend test`で全ユニットテスト green）。退会（`POST /users/me/withdraw`）も論理削除（`status: pendingDeletion`への遷移、`deletionScheduledAt`記録）まで実装済み
   - 未着手の既知ギャップ: 退会の**物理削除バッチ**（`deletionScheduledAt`経過後にDynamoDB項目を実削除するEventBridge + Lambdaのスケジュール実行）は未実装。着手時に追加すること
 - フロントエンド:
-  - 費目（カテゴリ）は実バックエンドAPI（`GET/POST /categories`, `PUT/DELETE /categories/{id}`）に配線済み（`src/lib/categories.ts`）
-  - 取引・予算・ダッシュボード集計・退会は引き続き`src/lib/local-store.ts`のlocalStorageモック、または`src/lib/auth.ts`の未実装エラー（バックエンドAPIとの実配線がまだのため）。各呼び出し箇所に`TODO(backend): ...`コメントで実API差し替え箇所を明記済み。バックエンド側は実装済みなので、次に着手する場合はこの配線差し替えが対象
-  - 認証: `amazon-cognito-identity-js`でCognito User Poolに直接連携（サインアップ→確認コード→ログイン→ログアウト）を実装済み（`src/lib/auth.ts`）。バックエンドを経由しない設計（`/auth/*`エンドポイントは存在しない、CLAUDE.mdの方針どおり）
+  - 費目・取引・予算・退会はすべて実バックエンドAPIに配線済み（`src/lib/categories.ts` / `transactions.ts` / `budgets.ts` / `account.ts`、いずれも`apiFetch`経由）。localStorageモック（`local-store.ts`）は削除済み
+  - ダッシュボードの集計（収支推移・資産形成推移・予実差）は`src/lib/aggregate.ts`によるクライアント側計算のまま。バックエンドの`/aggregation/*`エンドポイントは実装済みだがフロントからはまだ未使用（既知の積み残し。切り替える場合は取引・予算の全件取得をやめてこのエンドポイントを叩く形に変更する）
+  - 認証: `amazon-cognito-identity-js`でCognito User Poolに直接連携（サインアップ→確認コード→ログイン→ログアウト）を実装済み（`src/lib/auth.ts`）。バックエンドを経由しない設計（`/auth/*`エンドポイントは存在しない、CLAUDE.mdの方針どおり）。退会だけは例外的にバックエンドAPI（`POST /users/me/withdraw`）を叩く（`src/lib/account.ts`。`auth.ts`に置くと`api.ts`との循環importになるため分離）
   - ルート保護実装済み（未ログイン時はDashboard等から`/login`へリダイレクト、`src/components/auth/RequireAuth.tsx`）
   - 追加env: `VITE_COGNITO_USER_POOL_ID` / `VITE_COGNITO_CLIENT_ID`（`Household-<stage>-Auth`スタックの出力値。`.env.example`参照）
-  - **未デプロイのため未検証**: 実際のサインアップ/ログイン/API疎通はCognito User Pool・API Gatewayをデプロイして初めて確認できる。env未設定時は「認証設定が未構成です」と表示し、クラッシュしないことのみ確認済み
+  - **未デプロイのため未検証**: 実際のAPI疎通はCognito User Pool・API Gatewayをデプロイして初めて確認できる。env未設定時は「認証設定が未構成です」と表示し、クラッシュしないことのみ確認済み
 - インフラ: 5スタック（Auth/Data/Api/Hosting/Monitoring）で`cdk synth`確認済み。**まだAWSへ一度もdeployしていない**。Amplify HostingのGitHub連携とアラート通知先メールはコンテキストパラメータのプレースホルダーのみ（`amplifyGithubRepoUrl`, `amplifyGithubTokenSecretName`, `alertEmail`）

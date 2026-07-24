@@ -21,7 +21,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { getCurrentSession, requestAccountWithdrawal, signOut } from '@/lib/auth';
+import { requestAccountWithdrawal } from '@/lib/account';
+import { getCurrentSession, signOut } from '@/lib/auth';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -47,9 +48,11 @@ export default function SettingsPage() {
     setWithdrawalError(null);
     try {
       await requestAccountWithdrawal();
+      // 退会（論理削除）を受け付けたら、このセッションは以後使えないためログアウトする。
+      signOut();
+      navigate('/login', { replace: true });
     } catch (e) {
       setWithdrawalError(e instanceof Error ? e.message : '退会処理に失敗しました');
-    } finally {
       setIsSubmitting(false);
     }
   }

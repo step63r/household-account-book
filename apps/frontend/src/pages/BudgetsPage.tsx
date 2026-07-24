@@ -10,7 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { getCategories } from '@/lib/categories';
-import { getBudgets, upsertBudget } from '@/lib/local-store';
+import { getBudgets, upsertBudget } from '@/lib/budgets';
+import { EMPTY_ARRAY } from '@/lib/utils';
 
 function currentYearMonth(): string {
   return new Date().toISOString().slice(0, 7);
@@ -20,17 +21,16 @@ export default function BudgetsPage() {
   const queryClient = useQueryClient();
   const [yearMonth, setYearMonth] = useState(currentYearMonth());
 
-  // TODO(backend): GET /budgets?yearMonth=... に差し替え（GET /categories は実装済みのため src/lib/categories.ts 経由）
   const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: async () => getCategories() });
-  const budgetsQuery = useQuery({ queryKey: ['budgets'], queryFn: async () => getBudgets() });
+  const budgetsQuery = useQuery({
+    queryKey: ['budgets', yearMonth],
+    queryFn: async () => getBudgets(yearMonth),
+  });
   const categories = useMemo(
     () => (categoriesQuery.data ?? []).slice().sort((a, b) => a.sortOrder - b.sortOrder),
     [categoriesQuery.data],
   );
-  const budgetsForMonth = useMemo(
-    () => (budgetsQuery.data ?? []).filter((b) => b.yearMonth === yearMonth),
-    [budgetsQuery.data, yearMonth],
-  );
+  const budgetsForMonth = budgetsQuery.data ?? EMPTY_ARRAY;
 
   // amount のバリデーションは upsertBudgetInputSchema.shape.amount をそのまま各費目に適用する
   const amountSchema = upsertBudgetInputSchema.shape.amount;
@@ -47,12 +47,12 @@ export default function BudgetsPage() {
   });
 
   const saveMutation = useMutation({
-    // TODO(backend): PUT /budgets (upsert) に差し替え
     mutationFn: async (values: Record<string, number>) => {
-      for (const category of categories) {
-        const amount = values[category.id] ?? 0;
-        upsertBudget({ yearMonth, categoryId: category.id, amount });
-      }
+      await Promise.all(
+        categories.map((category) =>
+          upsertBudget({ yearMonth, categoryId: category.id, amount: values[category.id] ?? 0 }),
+        ),
+      );
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['budgets'] });

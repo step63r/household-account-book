@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { getCategories } from '@/lib/categories';
-import { createTransaction, deleteTransaction, getTransactions } from '@/lib/local-store';
+import { createTransaction, deleteTransaction, getTransactions } from '@/lib/transactions';
 import { EMPTY_ARRAY } from '@/lib/utils';
 
 const TYPE_LABEL: Record<TransactionType, string> = {
@@ -58,7 +58,6 @@ function today(): string {
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
 
-  // TODO(backend): GET /transactions に差し替え（GET /categories は実装済みのため src/lib/categories.ts 経由）
   const transactionsQuery = useQuery({ queryKey: ['transactions'], queryFn: async () => getTransactions() });
   const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: async () => getCategories() });
   const transactions = transactionsQuery.data ?? EMPTY_ARRAY;
@@ -66,7 +65,6 @@ export default function TransactionsPage() {
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
   const createMutation = useMutation({
-    // TODO(backend): POST /transactions に差し替え
     mutationFn: async (input: CreateTransactionInput) => createTransaction(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
@@ -75,7 +73,6 @@ export default function TransactionsPage() {
   });
 
   const deleteMutation = useMutation({
-    // TODO(backend): DELETE /transactions/:id に差し替え
     mutationFn: async (id: string) => deleteTransaction(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });

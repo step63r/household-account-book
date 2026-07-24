@@ -1,11 +1,9 @@
 /**
- * 費目（カテゴリ）API クライアント。
- *
- * apps/backend の `/categories` はフルスタックで実装済みの唯一のリソースなので、ここだけ
- * `apiFetch` 経由で実バックエンドに接続する（他のリソースは引き続き `local-store.ts`）。
+ * 費目（カテゴリ）API クライアント。`apiFetch` 経由で実バックエンドに接続する
+ * （`src/lib/transactions.ts` / `src/lib/budgets.ts` と同じ薄いラッパーの形）。
  * `CategoriesPage.tsx` に加え、費目一覧を参照する `DashboardPage.tsx` / `TransactionsPage.tsx` /
  * `BudgetsPage.tsx` も同じ TanStack Query キー `['categories']` でこのモジュールを使う
- * （取引・予算はローカルの費目 ID を参照するため、費目データソースは 1 箇所に揃える必要がある）。
+ * （取引・予算は費目 ID を参照するため、費目データソースは 1 箇所に揃える必要がある）。
  */
 import type { Category, CreateCategoryInput, UpdateCategoryInput } from '@household/shared';
 

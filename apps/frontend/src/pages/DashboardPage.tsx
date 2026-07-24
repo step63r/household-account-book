@@ -9,7 +9,8 @@ import { AssetFormationChart } from '@/components/charts/AssetFormationChart';
 import { BudgetVarianceList } from '@/components/charts/BudgetVarianceList';
 import { computeAssetFormationTrend, computeBudgetVariance, computeTrend } from '@/lib/aggregate';
 import { getCategories } from '@/lib/categories';
-import { getBudgets, getTransactions } from '@/lib/local-store';
+import { getBudgets } from '@/lib/budgets';
+import { getTransactions } from '@/lib/transactions';
 import { EMPTY_ARRAY } from '@/lib/utils';
 
 const GRANULARITY_LABEL: Record<TrendGranularity, string> = {
@@ -24,11 +25,14 @@ function currentYearMonth(): string {
 
 export default function DashboardPage() {
   const [granularity, setGranularity] = useState<TrendGranularity>('day');
+  const yearMonth = currentYearMonth();
 
-  // TODO(backend): GET /transactions, GET /budgets に差し替え（GET /categories は実装済みのため src/lib/categories.ts 経由）
   const transactionsQuery = useQuery({ queryKey: ['transactions'], queryFn: async () => getTransactions() });
   const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: async () => getCategories() });
-  const budgetsQuery = useQuery({ queryKey: ['budgets'], queryFn: async () => getBudgets() });
+  const budgetsQuery = useQuery({
+    queryKey: ['budgets', yearMonth],
+    queryFn: async () => getBudgets(yearMonth),
+  });
 
   const transactions = transactionsQuery.data ?? EMPTY_ARRAY;
   const budgets = budgetsQuery.data ?? EMPTY_ARRAY;
@@ -39,7 +43,6 @@ export default function DashboardPage() {
     () => computeAssetFormationTrend(transactions, granularity),
     [transactions, granularity],
   );
-  const yearMonth = currentYearMonth();
   const varianceRows = useMemo(
     () => computeBudgetVariance(transactions, budgets, categories, yearMonth),
     [transactions, budgets, categories, yearMonth],
