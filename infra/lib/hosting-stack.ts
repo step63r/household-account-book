@@ -1,22 +1,16 @@
 import * as amplify from '@aws-cdk/aws-amplify-alpha';
 import * as cdk from 'aws-cdk-lib';
+import { CfnApp } from 'aws-cdk-lib/aws-amplify';
 import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import type { Construct } from 'constructs';
 
 export interface HostingStackProps extends cdk.StackProps {
   readonly stage: 'dev' | 'prod';
   /**
-   * `https://github.com/<owner>/<repo>` - set via `-c amplifyGithubRepoUrl=...` once this repo
-   * has a GitHub remote. Left empty by default: TODO wiring, not a live connection.
+   * `https://github.com/<owner>/<repo>` - set via `-c amplifyGithubRepoUrl=...`. Left empty by
+   * default: TODO wiring, not a live connection.
    */
   readonly githubRepoUrl?: string;
-  /**
-   * Name of a Secrets Manager secret holding a GitHub PAT with `repo` scope, used to create the
-   * Amplify webhook/deploy key. Never pass the token itself as a context value/plaintext - CDK
-   * context ends up in cdk.context.json and CloudFormation template metadata. Set via
-   * `-c amplifyGithubTokenSecretName=...` once the secret exists.
-   */
-  readonly githubTokenSecretName?: string;
   /** Baked into the frontend build as VITE_COGNITO_USER_POOL_ID (see apps/frontend/.env.example). */
   readonly userPoolId: string;
   /** Baked into the frontend build as VITE_COGNITO_CLIENT_ID. */
@@ -29,13 +23,15 @@ export interface HostingStackProps extends cdk.StackProps {
  * Amplify Hosting app for the frontend SPA. Default `*.amplifyapp.com` domain only - no
  * Route 53 / custom domain / ACM cert (see CLAUDE.md).
  *
- * TODO(frontend-repo-connection): this app is intentionally NOT connected to a live GitHub repo
- * yet - this repo has no GitHub remote and no access token is available at scaffold time.
- * Once both exist, pass `-c amplifyGithubRepoUrl=https://github.com/<owner>/<repo>` and
- * `-c amplifyGithubTokenSecretName=<secret name>` (a Secrets Manager secret holding a GitHub
- * PAT, created out-of-band, e.g. `aws secretsmanager create-secret`) and this construct will
- * wire up `GitHubSourceCodeProvider` + a `main` branch automatically. Until then this stack
- * only provisions the bare App resource (no source provider, no branch, no build triggers).
+ * The GitHub connection itself is intentionally NOT managed by this construct. It was
+ * originally wired via `amplify.GitHubSourceCodeProvider` (a PAT stored in Secrets Manager,
+ * passed as `OauthToken`), but the app was since migrated to AWS's GitHub App-based
+ * authorization via the Amplify console (the PAT/OAuth token approach is being retired by AWS).
+ * `AWS::Amplify::App` has no CloudFormation property to declare a GitHub App connection, so
+ * CDK only sets `Repository` directly (via the L1 escape hatch) to keep that field's source of
+ * truth in code, and leaves `OauthToken`/`AccessToken` unset - Amplify's UpdateApp API treats
+ * omitted auth fields as "leave the existing connection alone" rather than clearing it, so this
+ * doesn't disturb the console-managed GitHub App connection on redeploy.
  */
 export class HostingStack extends cdk.Stack {
   public readonly app: amplify.App;
@@ -43,11 +39,8 @@ export class HostingStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: HostingStackProps) {
     super(scope, id, props);
 
-    const sourceCodeProvider = this.buildSourceCodeProvider(props);
-
     this.app = new amplify.App(this, 'FrontendApp', {
       appName: `household-${props.stage}-frontend`,
-      sourceCodeProvider,
       platform: amplify.Platform.WEB,
       // Vite only inlines VITE_* vars that are present in the build environment - CodeBuild
       // doesn't see the developer's local apps/frontend/.env (gitignored, never in the repo),
@@ -84,35 +77,15 @@ export class HostingStack extends cdk.Stack {
       }),
     });
 
-    // Only add a deployable branch once there's an actual repo connected - an auto-created
-    // branch with no source provider can't build anything. Branch name is "master", not the
-    // more common "main" - that's this repo's actual default branch (git remote has no "main").
-    if (sourceCodeProvider) {
+    if (props.githubRepoUrl) {
+      // See the class doc comment: intentionally Repository only, no OauthToken/AccessToken.
+      const cfnApp = this.app.node.defaultChild as CfnApp;
+      cfnApp.repository = props.githubRepoUrl;
+
+      // Only add a deployable branch once there's an actual repo connected - an auto-created
+      // branch with no repository can't build anything. Branch name is "master", not the more
+      // common "main" - that's this repo's actual default branch (git remote has no "main").
       this.app.addBranch('master', { stage: props.stage === 'prod' ? 'PRODUCTION' : 'DEVELOPMENT' });
     }
   }
-
-  private buildSourceCodeProvider(props: HostingStackProps): amplify.GitHubSourceCodeProvider | undefined {
-    if (!props.githubRepoUrl || !props.githubTokenSecretName) {
-      return undefined;
-    }
-    const { owner, repository } = parseGitHubRepoUrl(props.githubRepoUrl);
-    return new amplify.GitHubSourceCodeProvider({
-      owner,
-      repository,
-      oauthToken: cdk.SecretValue.secretsManager(props.githubTokenSecretName),
-    });
-  }
-}
-
-function parseGitHubRepoUrl(url: string): { owner: string; repository: string } {
-  const match = /github\.com\/([^/]+)\/([^/.]+)(\.git)?\/?$/.exec(url);
-  if (!match) {
-    throw new Error(`amplifyGithubRepoUrl is not a recognizable GitHub URL: ${url}`);
-  }
-  const [, owner, repository] = match;
-  if (!owner || !repository) {
-    throw new Error(`amplifyGithubRepoUrl is not a recognizable GitHub URL: ${url}`);
-  }
-  return { owner, repository };
 }

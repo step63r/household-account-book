@@ -17,8 +17,6 @@ if (stageContext !== undefined && stageContext !== 'dev' && stageContext !== 'pr
 // (`cdk deploy -c stage=prod ...`) so nobody accidentally deploys to prod via a stale shell env.
 const alertEmail: string | undefined = app.node.tryGetContext('alertEmail') || undefined;
 const amplifyGithubRepoUrl: string | undefined = app.node.tryGetContext('amplifyGithubRepoUrl') || undefined;
-const amplifyGithubTokenSecretName: string | undefined =
-  app.node.tryGetContext('amplifyGithubTokenSecretName') || undefined;
 
 // Same account/region for every stack in a stage; account/region are only known at synth/deploy
 // time via the default AWS CLI environment, never hardcoded here.
@@ -45,7 +43,6 @@ new HostingStack(app, `${stackNamePrefix}-Hosting`, {
   stage,
   env,
   githubRepoUrl: amplifyGithubRepoUrl,
-  githubTokenSecretName: amplifyGithubTokenSecretName,
   userPoolId: authStack.userPool.userPoolId,
   userPoolClientId: authStack.userPoolClient.userPoolClientId,
   apiEndpoint: apiStack.httpApi.apiEndpoint,
