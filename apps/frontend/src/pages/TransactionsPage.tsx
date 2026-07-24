@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Trash2 } from 'lucide-react';
 import {
   createTransactionInputSchema,
+  INCOME_SOURCE_PRESETS,
   type CreateTransactionInput,
   type Transaction,
   type TransactionType,
@@ -61,6 +62,15 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** 収入源Selectで「その他（自由入力）」を表す番兵値。incomeSourceの値としては保存しない。 */
+const CUSTOM_INCOME_SOURCE = '__custom__';
+
+function incomeSourceSelectValue(incomeSource: string): string {
+  return (INCOME_SOURCE_PRESETS as readonly string[]).includes(incomeSource)
+    ? incomeSource
+    : CUSTOM_INCOME_SOURCE;
+}
+
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
 
@@ -93,6 +103,7 @@ export default function TransactionsPage() {
         amount: 0,
         memo: '',
         transferLabel: '',
+        incomeSource: '',
       });
       setTypeValue('expense');
     },
@@ -114,6 +125,7 @@ export default function TransactionsPage() {
       amount: 0,
       memo: '',
       transferLabel: '',
+      incomeSource: '',
     },
   });
 
@@ -129,6 +141,7 @@ export default function TransactionsPage() {
       amount: tx.amount,
       memo: tx.memo ?? '',
       transferLabel: tx.transferLabel ?? '',
+      incomeSource: tx.incomeSource ?? '',
     });
   };
 
@@ -141,6 +154,7 @@ export default function TransactionsPage() {
       amount: 0,
       memo: '',
       transferLabel: '',
+      incomeSource: '',
     });
     setTypeValue('expense');
   };
@@ -148,9 +162,10 @@ export default function TransactionsPage() {
   const onSubmit = form.handleSubmit((values) => {
     const input: CreateTransactionInput = {
       ...values,
-      categoryId: values.type === 'transfer' ? null : values.categoryId,
+      categoryId: values.type === 'expense' ? values.categoryId : null,
       memo: values.memo || undefined,
       transferLabel: values.type === 'transfer' ? values.transferLabel || undefined : undefined,
+      incomeSource: values.type === 'income' ? values.incomeSource || undefined : undefined,
     };
     if (editingId) {
       updateMutation.mutate({ id: editingId, input });
@@ -233,6 +248,43 @@ export default function TransactionsPage() {
                       <FormMessage />
                     </FormItem>
                   )}
+                />
+              ) : typeValue === 'income' ? (
+                <FormField
+                  control={form.control}
+                  name="incomeSource"
+                  render={({ field }) => {
+                    const selectValue = field.value ? incomeSourceSelectValue(field.value) : undefined;
+                    return (
+                      <FormItem>
+                        <FormLabel>収入源</FormLabel>
+                        <Select
+                          value={selectValue}
+                          onValueChange={(v) => field.onChange(v === CUSTOM_INCOME_SOURCE ? '' : v)}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="収入源を選択" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {INCOME_SOURCE_PRESETS.map((preset) => (
+                              <SelectItem key={preset} value={preset}>
+                                {preset}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value={CUSTOM_INCOME_SOURCE}>その他（自由入力）</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {selectValue === CUSTOM_INCOME_SOURCE ? (
+                          <FormControl>
+                            <Input placeholder="収入源を入力" {...field} value={field.value ?? ''} className="mt-2" />
+                          </FormControl>
+                        ) : null}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               ) : (
                 <FormField
@@ -344,7 +396,9 @@ export default function TransactionsPage() {
                       <td className="py-2 pr-3 text-muted-foreground">
                         {tx.type === 'transfer'
                           ? (tx.transferLabel ?? '-')
-                          : (tx.categoryId && categoryById.get(tx.categoryId)?.name) || '未分類'}
+                          : tx.type === 'income'
+                            ? (tx.incomeSource ?? '未分類')
+                            : (tx.categoryId && categoryById.get(tx.categoryId)?.name) || '未分類'}
                       </td>
                       <td className="py-2 pr-3 text-right tabular-nums font-medium">
                         {yenFormatter.format(tx.amount)}

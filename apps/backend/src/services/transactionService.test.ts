@@ -26,7 +26,7 @@ describe('createTransaction', () => {
     await expect(repository.listByUser('user-1')).resolves.toEqual([]);
   });
 
-  it('rejects income/expense with a null categoryId', async () => {
+  it('rejects expense with a null categoryId', async () => {
     const repository = new FakeTransactionRepository();
 
     await expect(
@@ -60,6 +60,35 @@ describe('createTransaction', () => {
 
     expect(transaction.type).toBe('transfer');
     expect(transaction.categoryId).toBeNull();
+  });
+
+  it('rejects income with a non-null categoryId', async () => {
+    const repository = new FakeTransactionRepository();
+
+    await expect(
+      createTransaction(repository, 'user-1', {
+        date: '2026-07-10',
+        type: 'income',
+        categoryId: 'category-1',
+        amount: 300000,
+      }),
+    ).rejects.toThrow(HttpError);
+  });
+
+  it('accepts income with a null categoryId and an incomeSource', async () => {
+    const repository = new FakeTransactionRepository();
+
+    const transaction = await createTransaction(repository, 'user-1', {
+      date: '2026-07-10',
+      type: 'income',
+      categoryId: null,
+      amount: 300000,
+      incomeSource: '給与',
+    });
+
+    expect(transaction.type).toBe('income');
+    expect(transaction.categoryId).toBeNull();
+    expect(transaction.incomeSource).toBe('給与');
   });
 
   it('creates and persists a valid expense', async () => {

@@ -8,16 +8,19 @@ import {
 import type { TransactionListRange, TransactionRepository } from '../repository/transactionRepository';
 import { HttpError, NotFoundError } from '../lib/errors';
 
-/** income/expense には費目が必須、transfer には費目を付けない - CLAUDE.mdの取引種別の定義通り。 */
+/**
+ * expense には費目（categoryId）が必須。費目マスタは支出専用のため、transfer/income には
+ * 費目を付けない（transferLabel/incomeSourceという別のフィールドで表現する）。
+ */
 function assertCategoryIdRule(type: TransactionType, categoryId: string | null): void {
-  if (type === 'transfer') {
-    if (categoryId !== null) {
-      throw new HttpError(400, 'categoryId must be null when type is "transfer"');
+  if (type === 'expense') {
+    if (categoryId === null) {
+      throw new HttpError(400, `categoryId is required when type is "${type}"`);
     }
     return;
   }
-  if (categoryId === null) {
-    throw new HttpError(400, `categoryId is required when type is "${type}"`);
+  if (categoryId !== null) {
+    throw new HttpError(400, `categoryId must be null when type is "${type}"`);
   }
 }
 

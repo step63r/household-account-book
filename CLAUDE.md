@@ -32,9 +32,11 @@
 - トランザクション種別は `income`（収入）/ `expense`（支出）/ `transfer`（振替）の3種
   - 積立・投資・保険（貯蓄型）・NISA拠出などは `transfer` として記録し、収支推移・予実差の集計対象からは除外する
   - `transfer` は別途「資産形成推移」グラフで扱う想定
-- 費目（カテゴリ）は `type: fixed | variable`（固定費/変動費）を持つ
+- 費目（カテゴリ）は `type: fixed | variable`（固定費/変動費）を持つ。**支出専用**のマスタで、費目別ピボット・予算（予実差）はすべて `expense` のみが対象
   - プリセット費目（固定費11種＋変動費10種）はユーザー初回登録時にコピーして自動投入し、以後はユーザー所有データとして編集・削除する（プリセット定義自体は不変）
   - 費目の補足説明（括弧書き）はツールチップ表示用テキストとしてマスタに保持する
+- `income`（収入）は費目マスタを使わない。`categoryId` は必ず `null` で、代わりに自由記述の `incomeSource`（給与、賞与など）を持つ。理由: 支出用の固定費/変動費プリセットを収入に流用すると選択肢が噛み合わず（「給与」に「食費」を選ぶような違和感）、かつ費目別ピボット・予算は元々expense専用で収入の`categoryId`は集計上使われていなかったため。UI（`TransactionsPage.tsx`）は `INCOME_SOURCE_PRESETS`（給与/賞与/副業/一時所得）からの選択＋「その他」選択時の自由入力を提供する。`transfer`の`transferLabel`と同じ設計パターン
+  - バックエンドの`assertCategoryIdRule`（`transactionService.ts`）は `expense` のみ `categoryId` 必須、`income`/`transfer` は必ず `null` を要求する
 
 ## 非機能要件の決定事項
 
