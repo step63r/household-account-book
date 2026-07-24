@@ -1,21 +1,26 @@
 import type { APIGatewayProxyHandlerV2WithJWTAuthorizer } from 'aws-lambda';
 import { requireUserId } from '../lib/auth';
-import { handleError } from '../lib/errors';
+import { logAudit } from '../lib/audit';
+import { HttpError, handleError } from '../lib/errors';
+import { parseJsonBody } from '../lib/parseBody';
 import { jsonResponse } from '../lib/response';
+import { DynamoTransactionRepository } from '../repository/transactionRepository';
+import { updateTransaction } from '../services/transactionService';
 
-/**
- * PUT /transactions/{id}
- * TODO: implement.
- * - Validate the request body with updateTransactionInputSchema from @household/shared.
- * - The transaction's `date` is part of its sort key (TXN#<date>#<txnId>); if `date` changes,
- *   this needs a delete+put (key change), not a plain update-in-place.
- * - Emit an audit log via lib/audit.ts logAudit({ userId, action: 'transaction.update',
- *   targetId }).
- */
+const repository = new DynamoTransactionRepository();
+
+/** PUT /transactions/{id} - update a transaction. Validated with updateTransactionInputSchema. */
 export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
   try {
-    requireUserId(event);
-    return jsonResponse(501, { message: 'Not implemented' });
+    const userId = requireUserId(event);
+    const transactionId = event.pathParameters?.id;
+    if (!transactionId) {
+      throw new HttpError(400, 'Missing path parameter: id');
+    }
+    const input = parseJsonBody(event.body);
+    const transaction = await updateTransaction(repository, userId, transactionId, input);
+    logAudit({ userId, action: 'transaction.update', targetId: transaction.id });
+    return jsonResponse(200, transaction);
   } catch (error) {
     return handleError(error);
   }

@@ -1,24 +1,22 @@
 import type { APIGatewayProxyHandlerV2WithJWTAuthorizer } from 'aws-lambda';
 import { requireUserId } from '../lib/auth';
+import { logAudit } from '../lib/audit';
 import { handleError } from '../lib/errors';
+import { parseJsonBody } from '../lib/parseBody';
 import { jsonResponse } from '../lib/response';
+import { DynamoTransactionRepository } from '../repository/transactionRepository';
+import { createTransaction } from '../services/transactionService';
 
-/**
- * POST /transactions
- * TODO: implement.
- * - Validate the request body with createTransactionInputSchema from @household/shared.
- * - type=income/expense require categoryId; type=transfer may omit it (see transaction.ts
- *   comment "transfer では未設定でもよい") - enforce that pairing server-side.
- * - Persist under USER#<userId> / TXN#<date>#<txnId> (see repository/categoryRepository.ts
- *   for the pattern: a repository interface + Dynamo implementation + a testable service
- *   function that the handler delegates to).
- * - Emit an audit log via lib/audit.ts logAudit({ userId, action: 'transaction.create',
- *   targetId }) - mutating endpoints must always audit-log (CLAUDE.md).
- */
+const repository = new DynamoTransactionRepository();
+
+/** POST /transactions - create a transaction. Validated with createTransactionInputSchema. */
 export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
   try {
-    requireUserId(event);
-    return jsonResponse(501, { message: 'Not implemented' });
+    const userId = requireUserId(event);
+    const input = parseJsonBody(event.body);
+    const transaction = await createTransaction(repository, userId, input);
+    logAudit({ userId, action: 'transaction.create', targetId: transaction.id });
+    return jsonResponse(201, transaction);
   } catch (error) {
     return handleError(error);
   }

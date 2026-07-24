@@ -1,21 +1,30 @@
 import type { APIGatewayProxyHandlerV2WithJWTAuthorizer } from 'aws-lambda';
 import { requireUserId } from '../lib/auth';
-import { handleError } from '../lib/errors';
+import { logAudit } from '../lib/audit';
+import { HttpError, handleError } from '../lib/errors';
 import { jsonResponse } from '../lib/response';
+import { DynamoTransactionRepository } from '../repository/transactionRepository';
+import { deleteTransaction } from '../services/transactionService';
+
+const repository = new DynamoTransactionRepository();
 
 /**
- * DELETE /transactions/{id}
- * TODO: implement.
- * - Because the sort key is TXN#<date>#<txnId>, deleting by id alone requires either a
- *   GSI/lookup by id first, or accepting `date` as a query param so the sort key can be
- *   reconstructed directly - decide and document whichever approach is chosen.
- * - Emit an audit log via lib/audit.ts logAudit({ userId, action: 'transaction.delete',
- *   targetId }).
+ * DELETE /transactions/{id} - delete a transaction.
+ * The sort key embeds `date` (TXN#<date>#<txnId>), which isn't derivable from `id` alone, so
+ * the service looks the transaction up first (Query + in-memory filter, no GSI - see
+ * infra/lib/data-stack.ts) to resolve `date` before deleting. No `date` query param is
+ * required from the caller.
  */
 export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
   try {
-    requireUserId(event);
-    return jsonResponse(501, { message: 'Not implemented' });
+    const userId = requireUserId(event);
+    const transactionId = event.pathParameters?.id;
+    if (!transactionId) {
+      throw new HttpError(400, 'Missing path parameter: id');
+    }
+    await deleteTransaction(repository, userId, transactionId);
+    logAudit({ userId, action: 'transaction.delete', targetId: transactionId });
+    return jsonResponse(204);
   } catch (error) {
     return handleError(error);
   }
