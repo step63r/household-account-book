@@ -13,3 +13,13 @@ export function requireUserId(event: APIGatewayProxyEventV2WithJWTAuthorizer): s
   }
   return sub;
 }
+
+/** The ID token (not access token) is what the frontend sends - see apps/frontend/src/lib/api.ts
+ * getAuthToken() - so the standard `email` claim is present alongside `sub`. */
+export function requireEmail(event: APIGatewayProxyEventV2WithJWTAuthorizer): string {
+  const email = event.requestContext.authorizer?.jwt?.claims?.email;
+  if (typeof email !== 'string' || email.length === 0) {
+    throw new UnauthorizedError('Missing or invalid JWT email claim');
+  }
+  return email;
+}

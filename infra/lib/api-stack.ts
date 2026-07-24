@@ -30,11 +30,14 @@ const HANDLERS_DIR = path.join(__dirname, '..', '..', 'apps', 'backend', 'src', 
 /**
  * Route table mirroring apps/backend/src/handlers/*.ts as of this writing (the backend agent
  * scaffolds those files concurrently with this stack - re-check that directory and extend this
- * list when new handlers land, e.g. the CLAUDE.md 退会/account-withdrawal endpoint isn't
- * implemented yet). Method + path come from each handler file's leading doc comment.
+ * list when new handlers land). Method + path come from each handler file's leading doc comment.
  * DynamoDB actions are derived from the operations each handler's service/TODO comments
  * describe (Query for reads, Get+Put/Delete for single-item read-modify-write, etc.) - keep
  * these in sync with the repository code as it's implemented, don't default to grantReadWriteData.
+ *
+ * Note: this only covers synchronous request handlers behind the HTTP API. The 30-day
+ * physical-deletion batch for withdrawn accounts (CLAUDE.md's 退会 policy) is a separate
+ * scheduled Lambda + EventBridge rule, not implemented yet - out of scope for this route table.
  */
 const ROUTES: RouteDef[] = [
   // Categories - apps/backend/src/{handlers,services}/*Category*.ts
@@ -121,6 +124,13 @@ const ROUTES: RouteDef[] = [
     path: '/aggregation/budget-variance',
     handlerFile: 'getBudgetVariance',
     dynamoActions: ['dynamodb:Query'],
+  },
+  // Account withdrawal (logical delete only - see the module-level note on the physical-deletion batch)
+  {
+    method: apigwv2.HttpMethod.POST,
+    path: '/users/me/withdraw',
+    handlerFile: 'withdrawUser',
+    dynamoActions: ['dynamodb:GetItem', 'dynamodb:PutItem'],
   },
 ];
 
