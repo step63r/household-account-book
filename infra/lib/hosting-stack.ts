@@ -50,6 +50,10 @@ export class HostingStack extends cdk.Stack {
         VITE_COGNITO_USER_POOL_ID: props.userPoolId,
         VITE_COGNITO_CLIENT_ID: props.userPoolClientId,
       },
+      // The frontend is a client-side-routed SPA (React Router), so a direct request for e.g.
+      // /transactions has no matching object in the Amplify Hosting bucket and 404s unless
+      // rewritten to index.html - this affects both browser refresh and typing a path directly.
+      customRules: [amplify.CustomRule.SINGLE_PAGE_APPLICATION_REDIRECT],
       buildSpec: codebuild.BuildSpec.fromObjectToYaml({
         version: 1,
         applications: [
