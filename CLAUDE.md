@@ -25,7 +25,7 @@
 ### インフラ
 - IaC: AWS CDK (TypeScript)。フロント（Amplify Hostingのapp設定）とバックエンドを1つのCDKアプリで管理
 - CI/CD: GitHub Actions（`cdk deploy` 実行）+ Amplify Hostingの自動ビルド・デプロイ
-- 環境: dev / prod の2環境
+- 環境: prodのみ（個人利用のため。2026-07-24にdev/2環境構成からprod単一環境に切替済み。詳細は「実装状況」参照）
 
 ## ドメインモデル
 
@@ -66,7 +66,7 @@ pnpmワークスペース（`pnpm-workspace.yaml`）。ルート`package.json`�
 - `pnpm --filter @household/frontend dev` — フロントエンド開発サーバー起動（Vite）
 - `pnpm --filter @household/backend test` — バックエンドのユニットテスト（vitest、AWSには接続しない）
 - `cd infra && pnpm exec cdk synth` / `cdk diff` — CDKの構文検証・差分確認（副作用なし、ローカルで安全に実行可）
-- `cdk deploy` は実AWSへの課金・破壊的操作を伴うため、`infra-cdk`エージェント/CLAUDE.mdの方針どおり、実行前に必ずユーザーへ確認すること（2026-07-24にdev環境へ初回deploy済み。このAWSアカウントには本プロジェクト以外のCDK/SAMスタックも存在するため、`CDKToolkit`ブートストラップスタックなどアカウント共有リソースに触れる操作は特に慎重に）
+- `cdk deploy` は実AWSへの課金・破壊的操作を伴うため、`infra-cdk`エージェント/CLAUDE.mdの方針どおり、実行前に必ずユーザーへ確認すること。`infra/cdk.json`の`stage`コンテキストは`"prod"`固定（個人利用でdev環境を廃止したため。過去に存在した`Household-dev-*`一式は2026-07-24に完全削除済み）。このAWSアカウントには本プロジェクト以外のCDK/SAMスタックも存在するため、`CDKToolkit`ブートストラップスタックなどアカウント共有リソースに触れる操作は特に慎重に
 
 ## 実装状況
 
@@ -77,11 +77,11 @@ pnpmワークスペース（`pnpm-workspace.yaml`）。ルート`package.json`�
   - ダッシュボードの集計（収支推移・資産形成推移・予実差）は`src/lib/aggregate.ts`によるクライアント側計算のまま。バックエンドの`/aggregation/*`エンドポイントは実装済みだがフロントからはまだ未使用（既知の積み残し。切り替える場合は取引・予算の全件取得をやめてこのエンドポイントを叩く形に変更する）
   - 認証: `amazon-cognito-identity-js`でCognito User Poolに直接連携（サインアップ→確認コード→ログイン→ログアウト）を実装済み（`src/lib/auth.ts`）。バックエンドを経由しない設計（`/auth/*`エンドポイントは存在しない、CLAUDE.mdの方針どおり）。退会だけは例外的にバックエンドAPI（`POST /users/me/withdraw`）を叩く（`src/lib/account.ts`。`auth.ts`に置くと`api.ts`との循環importになるため分離）
   - ルート保護実装済み（未ログイン時はDashboard等から`/login`へリダイレクト、`src/components/auth/RequireAuth.tsx`）
-  - 追加env: `VITE_COGNITO_USER_POOL_ID` / `VITE_COGNITO_CLIENT_ID` / `VITE_API_BASE_URL`（`Household-dev-Auth`/`Household-dev-Api`スタックの出力値。`apps/frontend/.env`に設定済み、gitignore対象）
-  - dev環境の実APIに対して`GET /categories`が認証なしで401を返すことを確認済み（疎通そのものはOK）。実際のサインアップ〜ログイン〜画面操作のブラウザでの動作確認はまだ行っていない
-- インフラ: 5スタック（Auth/Data/Api/Hosting/Monitoring）を2026-07-24にdev環境へ初回deploy済み（`Household-dev-*`、リージョン`ap-northeast-1`、アカウント`966191971257`）。API Gatewayエンドポイントは`Household-dev-Api`スタックの`ApiEndpoint`出力を参照
-  - Amplify HostingはGitHub連携済み（`infra/cdk.json`の`amplifyGithubRepoUrl`/`amplifyGithubTokenSecretName`を設定してデプロイ）。ブランチ名は`master`（このリポジトリの実際のデフォルトブランチ。`infra/lib/hosting-stack.ts`のCDK addBranchは元`main`とハードコードされておりビルド失敗の原因になっていたため修正済み）
+  - 追加env: `VITE_COGNITO_USER_POOL_ID` / `VITE_COGNITO_CLIENT_ID` / `VITE_API_BASE_URL`（`Household-prod-Auth`/`Household-prod-Api`スタックの出力値。`apps/frontend/.env`に設定済み、gitignore対象）
+  - prod環境の実APIに対して`GET /categories`が認証なしで401を返すことを確認済み（疎通そのものはOK）。実際のサインアップ〜ログイン〜画面操作のブラウザでの動作確認はまだ行っていない
+- インフラ: 5スタック（Auth/Data/Api/Hosting/Monitoring）を`Household-prod-*`としてリージョン`ap-northeast-1`・アカウント`966191971257`にdeploy済み（2026-07-24。当初dev環境として作ったものを、個人利用でdev/prodを分ける必要が無いと判断しprod単一構成に切替。`Household-dev-*`一式は動作確認後に完全削除済み）。API Gatewayエンドポイントは`Household-prod-Api`スタックの`ApiEndpoint`出力を参照
+  - stageを切り替える場合、CloudFormationスタック名自体に`stage`が埋め込まれる設計（`household-${stage}-*`）のためリネームはできず、新環境を丸ごとdeploy→動作確認→旧環境をdestroyという流れになる（`cdk destroy -c stage=<旧stage>`のように、cdk.json変更後は明示的に`-c stage=...`で上書きしないと旧stageのスタックをCDKアプリが見失う点に注意 — 実際にこれではまった）
+  - Amplify HostingはGitHub連携済み（`infra/cdk.json`の`amplifyGithubRepoUrl`/`amplifyGithubTokenSecretName`を設定してデプロイ）。ブランチ名は`master`（このリポジトリの実際のデフォルトブランチ。`infra/lib/hosting-stack.ts`のCDK addBranchは元`main`とハードコードされておりビルド失敗の原因になっていたため修正済み）。GitHub PATを保存したSecrets Managerシークレット名は`household-dev-amplify-github-token`のまま（prod切替時にリネームしていない。内容的には問題ないが命名は不整合なので気になれば作り直してもよい）
   - Amplifyのビルド環境変数（`VITE_API_BASE_URL`/`VITE_COGNITO_USER_POOL_ID`/`VITE_COGNITO_CLIENT_ID`）は`infra/lib/hosting-stack.ts`の`amplify.App`の`environmentVariables`でAuth/Apiスタックからクロススタック参照して注入（`bin/app.ts`でHostingStackにuserPoolId/userPoolClientId/apiEndpointを渡す構成。開発者ローカルの`.env`はgitignore対象でCodeBuild環境には見えないため、ここで明示的に渡さないとフロントが「認証設定が未構成です」のまま本番ビルドされる — 実際にこれで一度ハマって修正した）
-  - 動作確認用に手動ビルド（`aws amplify start-job`）を実行しSUCCEED、`https://master.dq8qcdd07g8u.amplifyapp.com/`のJSバンドルに実際のUser Pool IDが埋め込まれていることまで確認済み。以後はmasterへのpushで自動ビルド。実ブラウザでのサインアップ〜ログイン操作自体はまだ未検証
+  - 動作確認用に手動ビルド（`aws amplify start-job`）を実行しSUCCEED、Amplifyの`https://master.<appId>.amplifyapp.com/`（`aws amplify list-apps`で確認）のJSバンドルに実際のUser Pool IDが埋め込まれていることまで確認済み。以後はmasterへのpushで自動ビルド（**注意**: モノレポ構成だがAmplify Gen1にパスベースのビルドスキップ機能は無く、`apps/backend`や`infra`だけの変更でも毎回フロントのビルドが走る。実害は小さいので現状放置）。実ブラウザでのサインアップ〜ログイン操作自体はまだ未検証
   - アラート通知先メール（`alertEmail`）は未設定のまま（コンテキストパラメータが空文字）
-  - prodへは未deploy
