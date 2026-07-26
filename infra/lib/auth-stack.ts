@@ -2,6 +2,13 @@ import * as cdk from 'aws-cdk-lib';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import type { Construct } from 'constructs';
 
+// This domain identity already exists and is verified in SES (set up outside this repo, for
+// another project sharing this AWS account - confirmed verified/production-access via
+// `aws sesv2 get-email-identity`/`get-account`). Deliberately NOT created as a CDK resource
+// here: this stack must not take ownership of a resource another project depends on.
+const SENDER_DOMAIN = 'minatoproject.com';
+const SENDER_EMAIL = `sender@${SENDER_DOMAIN}`;
+
 export interface AuthStackProps extends cdk.StackProps {
   readonly stage: 'dev' | 'prod';
 }
@@ -18,6 +25,12 @@ export interface AuthStackProps extends cdk.StackProps {
  *   (users aren't prompted) while keeping `MfaConfiguration` on the pool already set to a value
  *   CloudFormation can update in place later (flipping to `OFF`->`OPTIONAL` is a replacement in
  *   some SDKs, but `OPTIONAL`->`OPTIONAL` with an added `mfaSecondFactor` is not).
+ *
+ * Outbound email (verification codes, password recovery) is sent via SES from the
+ * `minatoproject.com` domain identity rather than Cognito's default sender, so it isn't
+ * capped at Cognito's low default sending quota. That SES identity is pre-existing and
+ * verified outside this stack (see `SENDER_DOMAIN` above) - not managed here as a CDK
+ * resource on purpose.
  */
 export class AuthStack extends cdk.Stack {
   public readonly userPool: cognito.UserPool;
@@ -47,6 +60,11 @@ export class AuthStack extends cdk.Stack {
       // just pre-positions the pool so turning MFA on later is a config flip, not a rebuild.
       // Prod holds real user accounts; dev doesn't need the same blast-radius protection.
       removalPolicy: props.stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
+      email: cognito.UserPoolEmail.withSES({
+        fromEmail: SENDER_EMAIL,
+        fromName: '家計簿アプリ',
+        sesVerifiedDomain: SENDER_DOMAIN,
+      }),
     });
 
     this.userPoolClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
