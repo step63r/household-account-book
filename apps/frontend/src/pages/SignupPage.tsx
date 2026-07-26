@@ -14,13 +14,13 @@ import {
   type ConfirmSignUpFormValues,
   type EmailPasswordFormValues,
 } from '@/lib/auth-schema';
-import { confirmSignUp, signUpWithEmailPassword } from '@/lib/auth';
+import { confirmSignUp, signInWithEmailPassword, signUpWithEmailPassword } from '@/lib/auth';
 
 export default function SignupPage() {
-  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   // サインアップ成功後、Cognito のメール確認コード入力ステップへ進む
-  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  // 確認コード検証後に自動ログインするため、パスワードも一時的に保持しておく
+  const [pendingCredentials, setPendingCredentials] = useState<EmailPasswordFormValues | null>(null);
 
   const signUpForm = useForm<EmailPasswordFormValues>({
     resolver: zodResolver(emailPasswordSchema),
@@ -31,18 +31,18 @@ export default function SignupPage() {
     setError(null);
     try {
       await signUpWithEmailPassword(values);
-      setPendingEmail(values.email);
+      setPendingCredentials(values);
     } catch (e) {
       setError(e instanceof Error ? e.message : '新規登録に失敗しました');
     }
   });
 
-  if (pendingEmail) {
+  if (pendingCredentials) {
     return (
       <ConfirmSignUpForm
-        email={pendingEmail}
-        onConfirmed={() => navigate('/login')}
-        onBackToSignUp={() => setPendingEmail(null)}
+        email={pendingCredentials.email}
+        password={pendingCredentials.password}
+        onBackToSignUp={() => setPendingCredentials(null)}
       />
     );
   }
@@ -104,13 +104,14 @@ export default function SignupPage() {
 
 function ConfirmSignUpForm({
   email,
-  onConfirmed,
+  password,
   onBackToSignUp,
 }: {
   email: string;
-  onConfirmed: () => void;
+  password: string;
   onBackToSignUp: () => void;
 }) {
+  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
   const confirmForm = useForm<ConfirmSignUpFormValues>({
@@ -122,9 +123,17 @@ function ConfirmSignUpForm({
     setError(null);
     try {
       await confirmSignUp({ email, code: values.code });
-      onConfirmed();
     } catch (e) {
       setError(e instanceof Error ? e.message : '確認コードの検証に失敗しました');
+      return;
+    }
+
+    // 確認自体は完了しているため、自動ログインに失敗してもログイン画面へ誘導する（登録をやり直させない）
+    try {
+      await signInWithEmailPassword({ email, password });
+      navigate('/dashboard');
+    } catch {
+      navigate('/login');
     }
   });
 
