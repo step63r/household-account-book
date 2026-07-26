@@ -134,6 +134,8 @@ export function computeBudgetVariance(
     ...actualByCategory.keys(),
   ]);
 
+  const categoryTypeOrder: Record<Category['type'], number> = { fixed: 0, variable: 1 };
+
   return [...categoryIds]
     .map((categoryId) => {
       const category = categoryById.get(categoryId);
@@ -146,7 +148,17 @@ export function computeBudgetVariance(
         actualAmount,
         varianceAmount: actualAmount - budgetAmount,
       };
-      return row;
+      return { row, category };
     })
-    .sort((a, b) => a.categoryName.localeCompare(b.categoryName, 'ja'));
+    .sort((a, b) => {
+      // 未分類（category未検出）は末尾に配置する
+      if (!a.category || !b.category) {
+        if (a.category === b.category) return a.row.categoryName.localeCompare(b.row.categoryName, 'ja');
+        return a.category ? -1 : 1;
+      }
+      const typeDiff = categoryTypeOrder[a.category.type] - categoryTypeOrder[b.category.type];
+      if (typeDiff !== 0) return typeDiff;
+      return a.category.sortOrder - b.category.sortOrder;
+    })
+    .map(({ row }) => row);
 }
