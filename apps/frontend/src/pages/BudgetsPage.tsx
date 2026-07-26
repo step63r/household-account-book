@@ -8,6 +8,7 @@ import { upsertBudgetInputSchema } from '@household/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { AmountInput } from '@/components/ui/amount-input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { getCategories } from '@/lib/categories';
 import { getBudgets, upsertBudget } from '@/lib/budgets';
@@ -132,15 +133,17 @@ function BudgetCategoryGroup({
                   <FormItem>
                     <FormLabel>{c.name}</FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        step={1}
+                      <AmountInput
                         name={field.name}
                         ref={field.ref}
-                        onBlur={field.onBlur}
                         value={field.value ?? 0}
-                        onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
+                        onChange={field.onChange}
+                        onBlur={() => {
+                          if (Number.isNaN(field.value)) {
+                            field.onChange(0);
+                          }
+                          field.onBlur();
+                        }}
                       />
                     </FormControl>
                     <FormMessage />

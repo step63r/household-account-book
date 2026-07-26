@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { AmountInput } from '@/components/ui/amount-input';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Form,
@@ -86,7 +87,7 @@ export default function TransactionsPage() {
     mutationFn: async (input: CreateTransactionInput) => createTransaction(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      form.reset({ ...form.getValues(), amount: 0, memo: '' });
+      form.reset({ ...form.getValues(), amount: NaN, memo: '' });
     },
   });
 
@@ -100,7 +101,7 @@ export default function TransactionsPage() {
         date: today(),
         type: 'expense',
         categoryId: null,
-        amount: 0,
+        amount: NaN,
         memo: '',
         transferLabel: '',
         incomeSource: '',
@@ -123,7 +124,7 @@ export default function TransactionsPage() {
       date: today(),
       type: 'expense',
       categoryId: null,
-      amount: 0,
+      amount: NaN,
       memo: '',
       transferLabel: '',
       incomeSource: '',
@@ -154,7 +155,7 @@ export default function TransactionsPage() {
       date: today(),
       type: 'expense',
       categoryId: null,
-      amount: 0,
+      amount: NaN,
       memo: '',
       transferLabel: '',
       incomeSource: '',
@@ -332,13 +333,7 @@ export default function TransactionsPage() {
                   <FormItem>
                     <FormLabel>金額（円）</FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        min={1}
-                        step={1}
-                        {...field}
-                        onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
-                      />
+                      <AmountInput {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
