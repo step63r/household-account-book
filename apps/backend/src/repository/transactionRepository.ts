@@ -50,26 +50,28 @@ export class DynamoTransactionRepository implements TransactionRepository {
 
     let keyCondition: string;
     const values: Record<string, string> = { ':pk': pk };
-    const isRangeBound = Boolean(from || to);
 
     if (from && to) {
       keyCondition = 'PK = :pk AND SK BETWEEN :skFrom AND :skTo';
       values[':skFrom'] = transactionSk(from, '');
       values[':skTo'] = transactionSk(to, '') + SK_UPPER_BOUND_SUFFIX;
     } else if (from) {
+      // Lower bound alone is safe without a prefix guard: every other SK prefix in this
+      // partition (PROFILE, CATEGORY#, BUDGET#) sorts below "TXN#", so ">= TXN#..." can
+      // never include a non-transaction item.
       keyCondition = 'PK = :pk AND SK >= :skFrom';
       values[':skFrom'] = transactionSk(from, '');
     } else if (to) {
-      keyCondition = 'PK = :pk AND SK <= :skTo';
+      // Unlike the `from`-only case, an upper bound alone (`SK <= :skTo`) would also match
+      // PROFILE/CATEGORY#/BUDGET# items, since they sort below "TXN#". Anchor the lower bound
+      // at the transaction prefix itself to keep this a KeyConditionExpression-only query -
+      // DynamoDB disallows filtering on key attributes, so this can't be done via
+      // FilterExpression (that previously threw a ValidationException here).
+      keyCondition = 'PK = :pk AND SK BETWEEN :skPrefix AND :skTo';
+      values[':skPrefix'] = TRANSACTION_SK_PREFIX;
       values[':skTo'] = transactionSk(to, '') + SK_UPPER_BOUND_SUFFIX;
     } else {
       keyCondition = 'PK = :pk AND begins_with(SK, :skPrefix)';
-      values[':skPrefix'] = TRANSACTION_SK_PREFIX;
-    }
-
-    // Defense-in-depth for the range-bound branches: an open-ended SK comparison could in
-    // principle include a non-transaction item if a future SK prefix sorted after "TXN#".
-    if (isRangeBound) {
       values[':skPrefix'] = TRANSACTION_SK_PREFIX;
     }
 
@@ -77,7 +79,6 @@ export class DynamoTransactionRepository implements TransactionRepository {
       new QueryCommand({
         TableName: getTableName(),
         KeyConditionExpression: keyCondition,
-        FilterExpression: isRangeBound ? 'begins_with(SK, :skPrefix)' : undefined,
         ExpressionAttributeValues: values,
       }),
     );
