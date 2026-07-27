@@ -22,8 +22,14 @@ export const emailPasswordSchema = z.object({
 });
 export type EmailPasswordFormValues = z.infer<typeof emailPasswordSchema>;
 
-/** サインアップ後のメール確認コード入力用スキーマ。 */
+/** サインアップ後のメール確認コード入力用スキーマ。設定画面のメールアドレス変更確認でも再利用する。 */
 export const confirmSignUpSchema = z.object({
   code: z.string().min(1, '確認コードを入力してください'),
 });
 export type ConfirmSignUpFormValues = z.infer<typeof confirmSignUpSchema>;
+
+/** 設定画面のメールアドレス変更フォーム用スキーマ。 */
+export const changeEmailSchema = z.object({
+  newEmail: z.string().min(1, 'メールアドレスを入力してください').email('メールアドレスの形式が正しくありません'),
+});
+export type ChangeEmailFormValues = z.infer<typeof changeEmailSchema>;

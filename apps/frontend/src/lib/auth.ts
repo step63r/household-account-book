@@ -39,6 +39,11 @@ export type ConfirmSignUpInput = {
   code: string;
 };
 
+type AuthenticatedUser = {
+  user: CognitoUser;
+  session: CognitoUserSession;
+};
+
 let cachedUserPool: CognitoUserPool | null = null;
 
 /**
@@ -151,10 +156,11 @@ export function signOut(): void {
 }
 
 /**
- * 現在の Cognito セッションを取得する。ログインしていない・環境変数未設定・トークン失効かつ
- * リフレッシュ不可の場合は `null` を返す（例外は投げない）。ルート保護や `getAuthToken` から使う。
+ * 現在ログイン中の `CognitoUser` を、有効なセッションを持つ状態で取得する。
+ * `updateAttributes`/`verifyAttribute` はセッション読み込み前に呼ぶと失敗するため、
+ * 呼び出し前に必ずこれを経由する。未ログイン等の場合は `null`（例外は投げない）。
  */
-export async function getCurrentSession(): Promise<CognitoUserSession | null> {
+async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> {
   let pool: CognitoUserPool;
   try {
     pool = getUserPool();
@@ -171,7 +177,64 @@ export async function getCurrentSession(): Promise<CognitoUserSession | null> {
         resolve(null);
         return;
       }
-      resolve(session);
+      resolve({ user, session });
     });
   });
+}
+
+/**
+ * 現在の Cognito セッションを取得する。ログインしていない・環境変数未設定・トークン失効かつ
+ * リフレッシュ不可の場合は `null` を返す（例外は投げない）。ルート保護や `getAuthToken` から使う。
+ */
+export async function getCurrentSession(): Promise<CognitoUserSession | null> {
+  const authenticated = await getAuthenticatedUser();
+  return authenticated?.session ?? null;
+}
+
+/**
+ * メールアドレス変更をリクエストする。Cognito 側で新アドレスに確認コードが送られ、
+ * `confirmEmailChange` で検証するまで実際の属性値は変わらない
+ * （User Pool の `keepOriginal.email` 設定による。infra/lib/auth-stack.ts 参照）。
+ */
+export async function requestEmailChange(newEmail: string): Promise<void> {
+  const endLoading = beginGlobalLoading();
+  try {
+    const authenticated = await getAuthenticatedUser();
+    if (!authenticated) {
+      throw new Error('ログインしていません');
+    }
+    const attribute = new CognitoUserAttribute({ Name: 'email', Value: newEmail });
+
+    await new Promise<void>((resolve, reject) => {
+      authenticated.user.updateAttributes([attribute], (err) => {
+        if (err) {
+          reject(new Error(describeCognitoError(err, 'メールアドレスの変更に失敗しました')));
+          return;
+        }
+        resolve();
+      });
+    });
+  } finally {
+    endLoading();
+  }
+}
+
+/** `requestEmailChange` で新アドレスに送られた確認コードを検証し、メールアドレス変更を完了する。 */
+export async function confirmEmailChange(code: string): Promise<void> {
+  const endLoading = beginGlobalLoading();
+  try {
+    const authenticated = await getAuthenticatedUser();
+    if (!authenticated) {
+      throw new Error('ログインしていません');
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      authenticated.user.verifyAttribute('email', code, {
+        onSuccess: () => resolve(),
+        onFailure: (err) => reject(new Error(describeCognitoError(err, '確認コードの検証に失敗しました'))),
+      });
+    });
+  } finally {
+    endLoading();
+  }
 }

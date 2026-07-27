@@ -25,6 +25,9 @@ export interface AuthStackProps extends cdk.StackProps {
  *   (users aren't prompted) while keeping `MfaConfiguration` on the pool already set to a value
  *   CloudFormation can update in place later (flipping to `OFF`->`OPTIONAL` is a replacement in
  *   some SDKs, but `OPTIONAL`->`OPTIONAL` with an added `mfaSecondFactor` is not).
+ * - `keepOriginal: { email: true }` requires verification of a new email address (a code sent to
+ *   it) before the attribute actually changes, instead of updating immediately - this backs the
+ *   Settings screen's email-change flow, which reuses the same OTP-confirmation UX as sign-up.
  *
  * Outbound email (verification codes, password recovery) is sent via SES from the
  * `minatoproject.com` domain identity rather than Cognito's default sender, so it isn't
@@ -47,6 +50,7 @@ export class AuthStack extends cdk.Stack {
       standardAttributes: {
         email: { required: true, mutable: true },
       },
+      keepOriginal: { email: true },
       passwordPolicy: {
         minLength: 8,
         requireLowercase: true,

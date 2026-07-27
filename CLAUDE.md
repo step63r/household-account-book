@@ -82,6 +82,7 @@ pnpmワークスペース（`pnpm-workspace.yaml`）。ルート`package.json`�
   - 費目・取引・予算・退会はすべて実バックエンドAPIに配線済み（`src/lib/categories.ts` / `transactions.ts` / `budgets.ts` / `account.ts`、いずれも`apiFetch`経由）。localStorageモック（`local-store.ts`）は削除済み
   - ダッシュボードの集計（収支推移・資産形成推移・予実差）は`src/lib/aggregate.ts`によるクライアント側計算のまま。バックエンドの`/aggregation/*`エンドポイントは実装済みだがフロントからはまだ未使用（既知の積み残し。切り替える場合は取引・予算の全件取得をやめてこのエンドポイントを叩く形に変更する）
   - 認証: `amazon-cognito-identity-js`でCognito User Poolに直接連携（サインアップ→確認コード→ログイン→ログアウト）を実装済み（`src/lib/auth.ts`）。バックエンドを経由しない設計（`/auth/*`エンドポイントは存在しない、CLAUDE.mdの方針どおり）。退会だけは例外的にバックエンドAPI（`POST /users/me/withdraw`）を叩く（`src/lib/account.ts`。`auth.ts`に置くと`api.ts`との循環importになるため分離）
+  - 設定画面でのメールアドレス変更も実装済み（`SettingsPage.tsx`、`src/lib/auth.ts`の`requestEmailChange`/`confirmEmailChange`）。認証と同様バックエンドを経由せずCognitoに直接連携し、User Poolの`keepOriginal.email`設定（`infra/lib/auth-stack.ts`）により新アドレス宛の確認コード検証が完了するまで実際のメール属性は変わらない。バックエンドのDynamoDBはメールアドレスをキャッシュしていない（退会時にJWTクレームから都度読むのみ）ため、この変更に追随するバックエンド側の対応は不要
   - ルート保護実装済み（未ログイン時はDashboard等から`/login`へリダイレクト、`src/components/auth/RequireAuth.tsx`）
   - 追加env: `VITE_COGNITO_USER_POOL_ID` / `VITE_COGNITO_CLIENT_ID` / `VITE_API_BASE_URL`（`Household-prod-Auth`/`Household-prod-Api`スタックの出力値。`apps/frontend/.env`に設定済み、gitignore対象）
   - prod環境の実APIに対して`GET /categories`が認証なしで401を返すことを確認済み（疎通そのものはOK）。実際のサインアップ〜ログイン〜画面操作のブラウザでの動作確認はまだ行っていない
