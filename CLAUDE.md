@@ -4,6 +4,10 @@
 
 技術選定の検討経緯・コスト試算・非機能要件の論点整理は `C:\Users\step6\.claude\plans\web-aws-pc-ui-ux-spicy-lemur.md` を参照。
 
+## Claude Codeに対する依頼事項
+
+- ユーザーに対する最終応答は必ず日本語で行うこと
+
 ## 技術スタック
 
 ### フロントエンド

@@ -65,6 +65,19 @@ function today(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date());
 }
 
+/** 日本時間の当月（YYYY-MM）。toISOString()はUTC基準になるため使わない
+ * （月初〜朝9時のUTC日付が前月にずれる）。 */
+function currentYearMonth(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date()).slice(0, 7);
+}
+
+/** 選択月（YYYY-MM）の初日・末日（YYYY-MM-DD）を返す。取引一覧の絞り込みに使う。 */
+function monthDateRange(yearMonth: string): { from: string; to: string } {
+  const [yearStr, monthStr] = yearMonth.split('-');
+  const lastDay = new Date(Number(yearStr), Number(monthStr), 0).getDate();
+  return { from: `${yearMonth}-01`, to: `${yearMonth}-${String(lastDay).padStart(2, '0')}` };
+}
+
 /** 収入源Selectで「その他（自由入力）」を表す番兵値。incomeSourceの値としては保存しない。 */
 const CUSTOM_INCOME_SOURCE = '__custom__';
 
@@ -75,7 +88,12 @@ function isCustomIncomeSource(incomeSource: string): boolean {
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
 
-  const transactionsQuery = useQuery({ queryKey: ['transactions'], queryFn: async () => getTransactions() });
+  const [yearMonth, setYearMonth] = useState(currentYearMonth());
+  const { from, to } = monthDateRange(yearMonth);
+  const transactionsQuery = useQuery({
+    queryKey: ['transactions', yearMonth],
+    queryFn: async () => getTransactions({ from, to }),
+  });
   const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: async () => getCategories() });
   const transactions = transactionsQuery.data ?? EMPTY_ARRAY;
   const categories = categoriesQuery.data ?? EMPTY_ARRAY;
@@ -374,8 +392,14 @@ export default function TransactionsPage() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
           <CardTitle>取引一覧</CardTitle>
+          <Input
+            type="month"
+            value={yearMonth}
+            onChange={(e) => setYearMonth(e.target.value)}
+            className="w-40"
+          />
         </CardHeader>
         <CardContent>
           {sortedTransactions.length === 0 ? (
