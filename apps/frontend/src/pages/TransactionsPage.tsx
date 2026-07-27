@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Trash2 } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   createTransactionInputSchema,
   INCOME_SOURCE_PRESETS,
+  type Category,
   type CreateTransactionInput,
   type Transaction,
   type TransactionType,
@@ -17,6 +18,14 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { AmountInput } from '@/components/ui/amount-input';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -85,6 +94,39 @@ function isCustomIncomeSource(incomeSource: string): boolean {
   return incomeSource !== '' && !(INCOME_SOURCE_PRESETS as readonly string[]).includes(incomeSource);
 }
 
+function defaultFormValues(transaction: Transaction | null): CreateTransactionInput {
+  if (!transaction) {
+    return {
+      date: today(),
+      type: 'expense',
+      categoryId: null,
+      amount: NaN,
+      memo: '',
+      transferLabel: '',
+      incomeSource: '',
+    };
+  }
+  return {
+    date: transaction.date,
+    type: transaction.type,
+    categoryId: transaction.categoryId,
+    amount: transaction.amount,
+    memo: transaction.memo ?? '',
+    transferLabel: transaction.transferLabel ?? '',
+    incomeSource: transaction.incomeSource ?? '',
+  };
+}
+
+function buildTransactionInput(values: CreateTransactionInput): CreateTransactionInput {
+  return {
+    ...values,
+    categoryId: values.type === 'expense' ? values.categoryId : null,
+    memo: values.memo || undefined,
+    transferLabel: values.type === 'transfer' ? values.transferLabel || undefined : undefined,
+    incomeSource: values.type === 'income' ? values.incomeSource || undefined : undefined,
+  };
+}
+
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
 
@@ -99,13 +141,15 @@ export default function TransactionsPage() {
   const categories = categoriesQuery.data ?? EMPTY_ARRAY;
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [dialogState, setDialogState] = useState<{ open: boolean; transaction: Transaction | null }>({
+    open: false,
+    transaction: null,
+  });
 
   const createMutation = useMutation({
     mutationFn: async (input: CreateTransactionInput) => createTransaction(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      form.reset({ ...form.getValues(), amount: NaN, memo: '' });
     },
   });
 
@@ -114,18 +158,6 @@ export default function TransactionsPage() {
       updateTransaction(id, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      setEditingId(null);
-      form.reset({
-        date: today(),
-        type: 'expense',
-        categoryId: null,
-        amount: NaN,
-        memo: '',
-        transferLabel: '',
-        incomeSource: '',
-      });
-      setTypeValue('expense');
-      setCustomIncomeSource(false);
     },
   });
 
@@ -136,66 +168,13 @@ export default function TransactionsPage() {
     },
   });
 
-  const form = useForm<CreateTransactionInput>({
-    resolver: zodResolver(createTransactionInputSchema),
-    defaultValues: {
-      date: today(),
-      type: 'expense',
-      categoryId: null,
-      amount: NaN,
-      memo: '',
-      transferLabel: '',
-      incomeSource: '',
-    },
-  });
+  function openCreateDialog() {
+    setDialogState({ open: true, transaction: null });
+  }
 
-  const [typeValue, setTypeValue] = useState<TransactionType>('expense');
-  const [customIncomeSource, setCustomIncomeSource] = useState(false);
-
-  const startEdit = (tx: Transaction) => {
-    setEditingId(tx.id);
-    setTypeValue(tx.type);
-    setCustomIncomeSource(isCustomIncomeSource(tx.incomeSource ?? ''));
-    form.reset({
-      date: tx.date,
-      type: tx.type,
-      categoryId: tx.categoryId,
-      amount: tx.amount,
-      memo: tx.memo ?? '',
-      transferLabel: tx.transferLabel ?? '',
-      incomeSource: tx.incomeSource ?? '',
-    });
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    form.reset({
-      date: today(),
-      type: 'expense',
-      categoryId: null,
-      amount: NaN,
-      memo: '',
-      transferLabel: '',
-      incomeSource: '',
-    });
-    setTypeValue('expense');
-    setCustomIncomeSource(false);
-  };
-
-  const onSubmit = form.handleSubmit((values) => {
-    const input: CreateTransactionInput = {
-      ...values,
-      categoryId: values.type === 'expense' ? values.categoryId : null,
-      memo: values.memo || undefined,
-      transferLabel: values.type === 'transfer' ? values.transferLabel || undefined : undefined,
-      incomeSource: values.type === 'income' ? values.incomeSource || undefined : undefined,
-    };
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, input });
-    } else {
-      createMutation.mutate(input);
-    }
-  });
+  function openEditDialog(transaction: Transaction) {
+    setDialogState({ open: true, transaction });
+  }
 
   const sortedTransactions = [...transactions].sort(
     (a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt),
@@ -203,193 +182,31 @@ export default function TransactionsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold">取引</h1>
-        <p className="text-sm text-muted-foreground">収入・支出・振替を記録します</p>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">取引</h1>
+          <p className="text-sm text-muted-foreground">収入・支出・振替を記録します</p>
+        </div>
+        <Dialog
+          open={dialogState.open}
+          onOpenChange={(open) => setDialogState((s) => ({ ...s, open }))}
+        >
+          <DialogTrigger asChild>
+            <Button onClick={openCreateDialog}>
+              <Plus className="size-4" />
+              取引を追加
+            </Button>
+          </DialogTrigger>
+          <TransactionFormDialog
+            key={dialogState.transaction?.id ?? 'new'}
+            transaction={dialogState.transaction}
+            categories={categories}
+            createMutation={createMutation}
+            updateMutation={updateMutation}
+            onOpenChange={(open) => setDialogState((s) => ({ ...s, open }))}
+          />
+        </Dialog>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{editingId ? '取引を編集' : '取引を追加'}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>日付</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>種別</FormLabel>
-                    <Select
-                      value={field.value}
-                      onValueChange={(v) => {
-                        field.onChange(v);
-                        setTypeValue(v as TransactionType);
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="income">収入</SelectItem>
-                        <SelectItem value="expense">支出</SelectItem>
-                        <SelectItem value="transfer">振替（積立・投資など）</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {typeValue === 'transfer' ? (
-                <FormField
-                  control={form.control}
-                  name="transferLabel"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>積立先</FormLabel>
-                      <FormControl>
-                        <Input placeholder="例: つみたてNISA" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              ) : typeValue === 'income' ? (
-                <FormField
-                  control={form.control}
-                  name="incomeSource"
-                  render={({ field }) => {
-                    const selectValue = customIncomeSource ? CUSTOM_INCOME_SOURCE : field.value || undefined;
-                    return (
-                      <FormItem>
-                        <FormLabel>収入源</FormLabel>
-                        <Select
-                          value={selectValue}
-                          onValueChange={(v) => {
-                            if (v === CUSTOM_INCOME_SOURCE) {
-                              setCustomIncomeSource(true);
-                              field.onChange('');
-                            } else {
-                              setCustomIncomeSource(false);
-                              field.onChange(v);
-                            }
-                          }}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="収入源を選択" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {INCOME_SOURCE_PRESETS.map((preset) => (
-                              <SelectItem key={preset} value={preset}>
-                                {preset}
-                              </SelectItem>
-                            ))}
-                            <SelectItem value={CUSTOM_INCOME_SOURCE}>その他（自由入力）</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {customIncomeSource ? (
-                          <FormControl>
-                            <Input placeholder="収入源を入力" {...field} value={field.value ?? ''} className="mt-2" />
-                          </FormControl>
-                        ) : null}
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }}
-                />
-              ) : (
-                <FormField
-                  control={form.control}
-                  name="categoryId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>費目</FormLabel>
-                      <Select value={field.value ?? undefined} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="費目を選択" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {categories.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>金額（円）</FormLabel>
-                    <FormControl>
-                      <AmountInput {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="memo"
-                render={({ field }) => (
-                  <FormItem className="sm:col-span-2 lg:col-span-3">
-                    <FormLabel>摘要</FormLabel>
-                    <FormControl>
-                      <Textarea rows={1} placeholder="任意" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="flex items-end gap-2">
-                <Button
-                  type="submit"
-                  disabled={createMutation.isPending || updateMutation.isPending}
-                  className="w-full"
-                >
-                  {editingId ? '更新する' : '追加する'}
-                </Button>
-                {editingId ? (
-                  <Button type="button" variant="outline" onClick={cancelEdit}>
-                    キャンセル
-                  </Button>
-                ) : null}
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
@@ -441,7 +258,7 @@ export default function TransactionsPage() {
                           variant="ghost"
                           size="icon"
                           aria-label="編集"
-                          onClick={() => startEdit(tx)}
+                          onClick={() => openEditDialog(tx)}
                         >
                           <Pencil className="size-4" />
                         </Button>
@@ -464,5 +281,228 @@ export default function TransactionsPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function TransactionFormDialog({
+  transaction,
+  categories,
+  createMutation,
+  updateMutation,
+  onOpenChange,
+}: {
+  transaction: Transaction | null;
+  categories: readonly Category[];
+  createMutation: UseMutationResult<Transaction, Error, CreateTransactionInput>;
+  updateMutation: UseMutationResult<Transaction, Error, { id: string; input: CreateTransactionInput }>;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const form = useForm<CreateTransactionInput>({
+    resolver: zodResolver(createTransactionInputSchema),
+    defaultValues: defaultFormValues(transaction),
+  });
+
+  const [typeValue, setTypeValue] = useState<TransactionType>(transaction?.type ?? 'expense');
+  const [customIncomeSource, setCustomIncomeSource] = useState(
+    isCustomIncomeSource(transaction?.incomeSource ?? ''),
+  );
+
+  const handleSubmit = form.handleSubmit((values) => {
+    const input = buildTransactionInput(values);
+    if (transaction) {
+      updateMutation.mutate({ id: transaction.id, input }, { onSuccess: () => onOpenChange(false) });
+    } else {
+      createMutation.mutate(input, { onSuccess: () => onOpenChange(false) });
+    }
+  });
+
+  const handleContinuousSubmit = form.handleSubmit((values) => {
+    const input = buildTransactionInput(values);
+    createMutation.mutate(input, {
+      onSuccess: () => {
+        form.reset({ ...form.getValues(), amount: NaN, memo: '' });
+      },
+    });
+  });
+
+  const pending = createMutation.isPending || updateMutation.isPending;
+
+  return (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>{transaction ? '取引を編集' : '取引を追加'}</DialogTitle>
+      </DialogHeader>
+      <Form {...form}>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <FormField
+            control={form.control}
+            name="date"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>日付</FormLabel>
+                <FormControl>
+                  <Input type="date" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="type"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>種別</FormLabel>
+                <Select
+                  value={field.value}
+                  onValueChange={(v) => {
+                    field.onChange(v);
+                    setTypeValue(v as TransactionType);
+                  }}
+                >
+                  <FormControl>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="income">収入</SelectItem>
+                    <SelectItem value="expense">支出</SelectItem>
+                    <SelectItem value="transfer">振替（積立・投資など）</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {typeValue === 'transfer' ? (
+            <FormField
+              control={form.control}
+              name="transferLabel"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>積立先</FormLabel>
+                  <FormControl>
+                    <Input placeholder="例: つみたてNISA" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          ) : typeValue === 'income' ? (
+            <FormField
+              control={form.control}
+              name="incomeSource"
+              render={({ field }) => {
+                const selectValue = customIncomeSource ? CUSTOM_INCOME_SOURCE : field.value || undefined;
+                return (
+                  <FormItem>
+                    <FormLabel>収入源</FormLabel>
+                    <Select
+                      value={selectValue}
+                      onValueChange={(v) => {
+                        if (v === CUSTOM_INCOME_SOURCE) {
+                          setCustomIncomeSource(true);
+                          field.onChange('');
+                        } else {
+                          setCustomIncomeSource(false);
+                          field.onChange(v);
+                        }
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="収入源を選択" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {INCOME_SOURCE_PRESETS.map((preset) => (
+                          <SelectItem key={preset} value={preset}>
+                            {preset}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value={CUSTOM_INCOME_SOURCE}>その他（自由入力）</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {customIncomeSource ? (
+                      <FormControl>
+                        <Input placeholder="収入源を入力" {...field} value={field.value ?? ''} className="mt-2" />
+                      </FormControl>
+                    ) : null}
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
+            />
+          ) : (
+            <FormField
+              control={form.control}
+              name="categoryId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>費目</FormLabel>
+                  <Select value={field.value ?? undefined} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="費目を選択" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {categories.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
+          <FormField
+            control={form.control}
+            name="amount"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>金額（円）</FormLabel>
+                <FormControl>
+                  <AmountInput {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="memo"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>摘要</FormLabel>
+                <FormControl>
+                  <Textarea rows={2} placeholder="任意" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <DialogFooter>
+            {transaction ? null : (
+              <Button type="button" variant="outline" onClick={handleContinuousSubmit} disabled={pending}>
+                連続登録する
+              </Button>
+            )}
+            <Button type="submit" disabled={pending}>
+              {transaction ? '更新する' : '登録する'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </Form>
+    </DialogContent>
   );
 }
