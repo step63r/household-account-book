@@ -10,6 +10,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { AmountInput } from '@/components/ui/amount-input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { getCategories } from '@/lib/categories';
 import { getBudgets, upsertBudget } from '@/lib/budgets';
 import { EMPTY_ARRAY } from '@/lib/utils';
@@ -20,9 +29,17 @@ function currentYearMonth(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date()).slice(0, 7);
 }
 
+function previousYearMonth(yearMonth: string): string {
+  const year = Number(yearMonth.slice(0, 4));
+  const month = Number(yearMonth.slice(5, 7));
+  const date = new Date(Date.UTC(year, month - 2, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 export default function BudgetsPage() {
   const queryClient = useQueryClient();
   const [yearMonth, setYearMonth] = useState(currentYearMonth());
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
 
   const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: async () => getCategories() });
   const budgetsQuery = useQuery({
@@ -64,6 +81,22 @@ export default function BudgetsPage() {
 
   const onSubmit = form.handleSubmit((values) => saveMutation.mutate(values));
 
+  const copyMutation = useMutation({
+    mutationFn: async () => {
+      const prevBudgets = await getBudgets(previousYearMonth(yearMonth));
+      await Promise.all(
+        categories.map((category) => {
+          const amount = prevBudgets.find((b) => b.categoryId === category.id)?.amount ?? 0;
+          return upsertBudget({ yearMonth, categoryId: category.id, amount });
+        }),
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      setCopyDialogOpen(false);
+    },
+  });
+
   const fixedCategories = categories.filter((c) => c.type === 'fixed');
   const variableCategories = categories.filter((c) => c.type === 'variable');
 
@@ -93,7 +126,40 @@ export default function BudgetsPage() {
           <BudgetCategoryGroup title="固定費" categories={fixedCategories} control={form.control} />
           <BudgetCategoryGroup title="変動費" categories={variableCategories} control={form.control} />
 
-          <div className="flex justify-end">
+          <div className="flex justify-between">
+            <Dialog open={copyDialogOpen} onOpenChange={setCopyDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={categories.length === 0 || saveMutation.isPending || copyMutation.isPending}
+                >
+                  前月をコピー
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>前月の予算をコピーしますか？</DialogTitle>
+                  <DialogDescription>
+                    {previousYearMonth(yearMonth)} の予算を {yearMonth} にコピーして保存します。
+                    現在保存されている {yearMonth} の予算（未保存の変更があれば破棄されます）は上書きされます。
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setCopyDialogOpen(false)}>
+                    キャンセル
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => copyMutation.mutate()}
+                    disabled={copyMutation.isPending}
+                  >
+                    コピーする
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
             <Button type="submit" disabled={saveMutation.isPending || categories.length === 0}>
               予算を保存
             </Button>
