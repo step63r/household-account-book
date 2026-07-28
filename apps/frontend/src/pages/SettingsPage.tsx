@@ -1,11 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertTriangle, LogOut } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Card,
   CardContent,
@@ -24,15 +21,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { ChangeEmailDialog } from '@/components/settings/ChangeEmailDialog';
+import { ChangePasswordDialog } from '@/components/settings/ChangePasswordDialog';
 import { requestAccountWithdrawal } from '@/lib/account';
-import { confirmEmailChange, getCurrentSession, requestEmailChange, signOut } from '@/lib/auth';
-import {
-  changeEmailSchema,
-  confirmSignUpSchema,
-  type ChangeEmailFormValues,
-  type ConfirmSignUpFormValues,
-} from '@/lib/auth-schema';
+import { getCurrentSession, signOut } from '@/lib/auth';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -40,6 +32,11 @@ export default function SettingsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   // ID トークンの email クレームから表示する（GET /users/me 相当のバックエンドAPIはまだ無い）
   const [email, setEmail] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  function handleSuccess(message: string) {
+    setSuccessMessage(message);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +76,8 @@ export default function SettingsPage() {
         <p className="text-sm text-muted-foreground">アカウント情報の確認・退会手続きを行えます</p>
       </div>
 
+      {successMessage && <p className="text-sm text-muted-foreground">{successMessage}</p>}
+
       <Card>
         <CardHeader>
           <CardTitle>アカウント情報</CardTitle>
@@ -102,7 +101,28 @@ export default function SettingsPage() {
         </CardFooter>
       </Card>
 
-      <ChangeEmailCard onEmailChanged={setEmail} />
+      <Card>
+        <CardHeader>
+          <CardTitle>セキュリティ</CardTitle>
+          <CardDescription>メールアドレスやパスワードを変更します</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">メールアドレス</p>
+              <p className="text-sm text-muted-foreground">ログインに使用するメールアドレスを変更します</p>
+            </div>
+            <ChangeEmailDialog onEmailChanged={setEmail} onSuccess={handleSuccess} />
+          </div>
+          <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+            <div>
+              <p className="text-sm font-medium">パスワード</p>
+              <p className="text-sm text-muted-foreground">ログインパスワードを変更します</p>
+            </div>
+            <ChangePasswordDialog onSuccess={handleSuccess} />
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="border-destructive/40">
         <CardHeader>
@@ -145,138 +165,5 @@ export default function SettingsPage() {
         </CardFooter>
       </Card>
     </div>
-  );
-}
-
-function ChangeEmailCard({ onEmailChanged }: { onEmailChanged: (email: string) => void }) {
-  const [pendingNewEmail, setPendingNewEmail] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  const requestForm = useForm<ChangeEmailFormValues>({
-    resolver: zodResolver(changeEmailSchema),
-    defaultValues: { newEmail: '' },
-  });
-
-  const onSubmitRequest = requestForm.handleSubmit(async (values) => {
-    setError(null);
-    try {
-      await requestEmailChange(values.newEmail);
-      setPendingNewEmail(values.newEmail);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'メールアドレスの変更に失敗しました');
-    }
-  });
-
-  if (pendingNewEmail) {
-    return (
-      <ConfirmEmailChangeCard
-        newEmail={pendingNewEmail}
-        onBack={() => setPendingNewEmail(null)}
-        onConfirmed={() => {
-          onEmailChanged(pendingNewEmail);
-          setPendingNewEmail(null);
-          setSuccessMessage('メールアドレスを変更しました');
-          requestForm.reset({ newEmail: '' });
-        }}
-      />
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>メールアドレス変更</CardTitle>
-        <CardDescription>
-          新しいメールアドレス宛に確認コードを送信します。コードを入力すると変更が完了します。
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...requestForm}>
-          <form onSubmit={onSubmitRequest} className="flex flex-col gap-4">
-            <FormField
-              control={requestForm.control}
-              name="newEmail"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>新しいメールアドレス</FormLabel>
-                  <FormControl>
-                    <Input type="email" autoComplete="email" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {successMessage && <p className="text-sm text-muted-foreground">{successMessage}</p>}
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" disabled={requestForm.formState.isSubmitting} className="self-start">
-              確認コードを送信
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ConfirmEmailChangeCard({
-  newEmail,
-  onBack,
-  onConfirmed,
-}: {
-  newEmail: string;
-  onBack: () => void;
-  onConfirmed: () => void;
-}) {
-  const [error, setError] = useState<string | null>(null);
-
-  const confirmForm = useForm<ConfirmSignUpFormValues>({
-    resolver: zodResolver(confirmSignUpSchema),
-    defaultValues: { code: '' },
-  });
-
-  const onSubmitConfirm = confirmForm.handleSubmit(async (values) => {
-    setError(null);
-    try {
-      await confirmEmailChange(values.code);
-      onConfirmed();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '確認コードの検証に失敗しました');
-    }
-  });
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>メールアドレス変更</CardTitle>
-        <CardDescription>{newEmail} 宛に届いた確認コードを入力してください</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...confirmForm}>
-          <form onSubmit={onSubmitConfirm} className="flex flex-col gap-4">
-            <FormField
-              control={confirmForm.control}
-              name="code"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>確認コード</FormLabel>
-                  <FormControl>
-                    <Input inputMode="numeric" autoComplete="one-time-code" placeholder="123456" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" disabled={confirmForm.formState.isSubmitting} className="self-start">
-              確認する
-            </Button>
-            <Button type="button" variant="ghost" onClick={onBack} className="self-start">
-              メールアドレスを変更し直す
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
   );
 }

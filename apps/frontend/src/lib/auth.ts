@@ -238,3 +238,26 @@ export async function confirmEmailChange(code: string): Promise<void> {
     endLoading();
   }
 }
+
+/** ログイン中ユーザーのパスワードを変更する。1ステップで完結し、成功後も既存セッションは失効しない。 */
+export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  const endLoading = beginGlobalLoading();
+  try {
+    const authenticated = await getAuthenticatedUser();
+    if (!authenticated) {
+      throw new Error('ログインしていません');
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      authenticated.user.changePassword(oldPassword, newPassword, (err) => {
+        if (err) {
+          reject(new Error(describeCognitoError(err, 'パスワードの変更に失敗しました')));
+          return;
+        }
+        resolve();
+      });
+    });
+  } finally {
+    endLoading();
+  }
+}

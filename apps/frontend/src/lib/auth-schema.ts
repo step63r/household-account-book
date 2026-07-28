@@ -33,3 +33,25 @@ export const changeEmailSchema = z.object({
   newEmail: z.string().min(1, 'メールアドレスを入力してください').email('メールアドレスの形式が正しくありません'),
 });
 export type ChangeEmailFormValues = z.infer<typeof changeEmailSchema>;
+
+/** 設定画面のパスワード変更フォーム用スキーマ。パスワードルールは emailPasswordSchema と揃える。 */
+export const changePasswordSchema = z
+  .object({
+    oldPassword: z.string().min(1, '現在のパスワードを入力してください'),
+    newPassword: z
+      .string()
+      .min(8, 'パスワードは8文字以上で入力してください')
+      .regex(/[a-z]/, 'パスワードには英小文字を含めてください')
+      .regex(/[A-Z]/, 'パスワードには英大文字を含めてください')
+      .regex(/[0-9]/, 'パスワードには数字を含めてください'),
+    newPasswordConfirmation: z.string().min(1, '新しいパスワード（確認）を入力してください'),
+  })
+  .refine((data) => data.newPassword === data.newPasswordConfirmation, {
+    message: 'パスワードが一致しません',
+    path: ['newPasswordConfirmation'],
+  })
+  .refine((data) => data.newPassword !== data.oldPassword, {
+    message: '新しいパスワードは現在のパスワードと異なるものにしてください',
+    path: ['newPassword'],
+  });
+export type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
