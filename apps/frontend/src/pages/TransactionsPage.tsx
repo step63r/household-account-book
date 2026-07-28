@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { AmountInput } from '@/components/ui/amount-input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -220,7 +221,9 @@ export default function TransactionsPage() {
           />
         </CardHeader>
         <CardContent>
-          {sortedTransactions.length === 0 ? (
+          {transactionsQuery.isPending ? (
+            <TransactionsTableSkeleton />
+          ) : sortedTransactions.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">取引がまだありません</p>
           ) : (
             <div className="overflow-x-auto">
@@ -281,6 +284,49 @@ export default function TransactionsPage() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function TransactionsTableSkeleton() {
+  return (
+    <div className="overflow-x-auto" aria-label="取引一覧を読み込み中" aria-busy="true">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border text-left text-muted-foreground">
+            <th className="py-2 pr-3 font-normal">日付</th>
+            <th className="py-2 pr-3 font-normal">種別</th>
+            <th className="py-2 pr-3 font-normal">費目</th>
+            <th className="py-2 pr-3 text-right font-normal">金額</th>
+            <th className="py-2 pr-3 font-normal">摘要</th>
+            <th className="py-2 font-normal" />
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: 8 }, (_, i) => (
+            <tr key={i} className="border-b border-border last:border-0">
+              <td className="py-2 pr-3">
+                <Skeleton className="h-4 w-20" />
+              </td>
+              <td className="py-2 pr-3">
+                <Skeleton className="h-5 w-12 rounded-full" />
+              </td>
+              <td className="py-2 pr-3">
+                <Skeleton className="h-4 w-24" />
+              </td>
+              <td className="py-2 pr-3">
+                <Skeleton className="ml-auto h-4 w-16" />
+              </td>
+              <td className="py-2 pr-3">
+                <Skeleton className="h-4 w-32" />
+              </td>
+              <td className="py-2 text-right">
+                <Skeleton className="ml-auto h-8 w-16" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

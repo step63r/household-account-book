@@ -10,6 +10,9 @@ import {
 } from 'recharts';
 import type { TrendGranularity, TrendPoint } from '@household/shared';
 import { formatPeriodLabel, formatPeriodTick } from '@/lib/date';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const BAR_SKELETON_HEIGHTS = [55, 80, 40, 95, 60, 75, 45];
 
 const yenFormatter = new Intl.NumberFormat('ja-JP', {
   style: 'currency',
@@ -53,10 +56,30 @@ function CustomTooltip({
 export function TrendChart({
   data,
   granularity,
+  isLoading,
 }: {
   data: TrendPoint[];
   granularity: TrendGranularity;
+  isLoading?: boolean;
 }) {
+  if (isLoading) {
+    return (
+      <div
+        className="flex h-64 w-full items-end gap-3 px-1"
+        role="img"
+        aria-label="収支推移グラフを読み込み中"
+        aria-busy="true"
+      >
+        {BAR_SKELETON_HEIGHTS.map((height, i) => (
+          <div key={i} className="flex flex-1 flex-col items-center gap-2">
+            <Skeleton className="w-full" style={{ height: `${height}%` }} />
+            <Skeleton className="h-3 w-8" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   if (data.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">

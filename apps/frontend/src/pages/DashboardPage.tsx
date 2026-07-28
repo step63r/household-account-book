@@ -40,6 +40,7 @@ export default function DashboardPage() {
   const transactions = transactionsQuery.data ?? EMPTY_ARRAY;
   const budgets = budgetsQuery.data ?? EMPTY_ARRAY;
   const categories = categoriesQuery.data ?? EMPTY_ARRAY;
+  const isInitialLoading = transactionsQuery.isPending || categoriesQuery.isPending || budgetsQuery.isPending;
 
   const trendData = useMemo(() => computeTrend(transactions, granularity), [transactions, granularity]);
   const assetFormationData = useMemo(
@@ -77,7 +78,7 @@ export default function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <TrendChart data={trendData} granularity={granularity} />
+          <TrendChart data={trendData} granularity={granularity} isLoading={isInitialLoading} />
         </CardContent>
       </Card>
 
@@ -88,7 +89,7 @@ export default function DashboardPage() {
             <CardDescription>{formatYearMonth(yearMonth)} の予算に対する実績</CardDescription>
           </CardHeader>
           <CardContent>
-            <BudgetVarianceList rows={varianceRows} />
+            <BudgetVarianceList rows={varianceRows} isLoading={isInitialLoading} />
           </CardContent>
         </Card>
 
@@ -98,7 +99,7 @@ export default function DashboardPage() {
             <CardDescription>積立・投資・保険・NISA拠出などの振替のみを集計（収支には含みません）</CardDescription>
           </CardHeader>
           <CardContent>
-            <AssetFormationChart data={assetFormationData} granularity={granularity} />
+            <AssetFormationChart data={assetFormationData} granularity={granularity} isLoading={isInitialLoading} />
           </CardContent>
         </Card>
       </div>

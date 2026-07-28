@@ -10,6 +10,9 @@ import {
 import type { TrendGranularity } from '@household/shared';
 import type { AssetFormationPoint } from '@/lib/aggregate';
 import { formatPeriodLabel, formatPeriodTick } from '@/lib/date';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const TREND_SKELETON_HEIGHTS = [35, 45, 55, 70, 85];
 
 const yenFormatter = new Intl.NumberFormat('ja-JP', {
   style: 'currency',
@@ -48,10 +51,30 @@ function CustomTooltip({
 export function AssetFormationChart({
   data,
   granularity,
+  isLoading,
 }: {
   data: AssetFormationPoint[];
   granularity: TrendGranularity;
+  isLoading?: boolean;
 }) {
+  if (isLoading) {
+    return (
+      <div
+        className="flex h-56 w-full items-end gap-3 px-1"
+        role="img"
+        aria-label="資産形成推移グラフを読み込み中"
+        aria-busy="true"
+      >
+        {TREND_SKELETON_HEIGHTS.map((height, i) => (
+          <div key={i} className="flex flex-1 flex-col items-center gap-2">
+            <Skeleton className="w-full" style={{ height: `${height}%` }} />
+            <Skeleton className="h-3 w-8" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   if (data.length === 0) {
     return (
       <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">

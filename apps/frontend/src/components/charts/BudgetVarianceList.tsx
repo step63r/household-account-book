@@ -1,5 +1,6 @@
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import type { BudgetVarianceRow } from '@household/shared';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const yenFormatter = new Intl.NumberFormat('ja-JP', {
   style: 'currency',
@@ -8,7 +9,30 @@ const yenFormatter = new Intl.NumberFormat('ja-JP', {
 });
 
 /** 予実差の表示エリア（費目別、当月）。バー(メーター)+ステータス色で over/under を示す。 */
-export function BudgetVarianceList({ rows }: { rows: BudgetVarianceRow[] }) {
+export function BudgetVarianceList({
+  rows,
+  isLoading,
+}: {
+  rows: BudgetVarianceRow[];
+  isLoading?: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <ul className="flex flex-col gap-4" aria-label="予実差を読み込み中" aria-busy="true">
+        {[0, 1, 2].map((i) => (
+          <li key={i} className="flex flex-col gap-1.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+            <Skeleton className="h-2 w-full rounded-full" />
+            <Skeleton className="h-3 w-20" />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
   if (rows.length === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
