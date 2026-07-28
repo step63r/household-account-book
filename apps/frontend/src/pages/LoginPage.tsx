@@ -79,6 +79,11 @@ export default function LoginPage() {
               新規登録
             </Link>
           </p>
+          <p className="mt-2 text-center text-sm text-muted-foreground">
+            <Link to="/reset-password" className="text-primary underline-offset-4 hover:underline">
+              パスワードをお忘れですか？
+            </Link>
+          </p>
         </CardContent>
       </Card>
     </div>

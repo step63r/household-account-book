@@ -146,6 +146,54 @@ export async function signInWithEmailPassword({ email, password }: EmailPassword
   }
 }
 
+/**
+ * パスワード再設定（忘れた場合）の受付。Cognito がメールで確認コードを送信する
+ * （実際にはユーザー向けにはリンク形式に書き換える CustomMessage Lambda トリガーを別途設定する想定）。
+ * 未ログイン状態で呼ばれるため `getAuthenticatedUser` は使わず `getCognitoUser` を直接使う。
+ */
+export async function forgotPassword(email: string): Promise<void> {
+  const endLoading = beginGlobalLoading();
+  try {
+    const user = getCognitoUser(email);
+
+    await new Promise<void>((resolve, reject) => {
+      user.forgotPassword({
+        onSuccess: () => resolve(),
+        onFailure: (err) => reject(new Error(describeCognitoError(err, 'パスワード再設定の受付に失敗しました'))),
+      });
+    });
+  } finally {
+    endLoading();
+  }
+}
+
+export type ConfirmForgotPasswordInput = {
+  email: string;
+  code: string;
+  newPassword: string;
+};
+
+/** `forgotPassword` で送られた確認コードを検証し、新しいパスワードを設定する。旧パスワードは不要。 */
+export async function confirmForgotPassword({
+  email,
+  code,
+  newPassword,
+}: ConfirmForgotPasswordInput): Promise<void> {
+  const endLoading = beginGlobalLoading();
+  try {
+    const user = getCognitoUser(email);
+
+    await new Promise<void>((resolve, reject) => {
+      user.confirmPassword(code, newPassword, {
+        onSuccess: () => resolve(),
+        onFailure: (err) => reject(new Error(describeCognitoError(err, 'パスワードの再設定に失敗しました'))),
+      });
+    });
+  } finally {
+    endLoading();
+  }
+}
+
 /** ログアウト。ローカルに保存されたセッション情報を破棄する（Cognito 側の失効はしない `signOut`）。 */
 export function signOut(): void {
   try {

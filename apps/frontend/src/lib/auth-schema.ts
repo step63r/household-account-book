@@ -55,3 +55,26 @@ export const changePasswordSchema = z
     path: ['newPassword'],
   });
 export type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
+
+/** パスワード再設定（忘れた場合）のリクエストフォーム用スキーマ。 */
+export const forgotPasswordSchema = z.object({
+  email: z.string().min(1, 'メールアドレスを入力してください').email('メールアドレスの形式が正しくありません'),
+});
+export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
+
+/** パスワード再設定（忘れた場合）の新パスワード設定フォーム用スキーマ。パスワードルールは emailPasswordSchema と揃える。 */
+export const resetPasswordSchema = z
+  .object({
+    newPassword: z
+      .string()
+      .min(8, 'パスワードは8文字以上で入力してください')
+      .regex(/[a-z]/, 'パスワードには英小文字を含めてください')
+      .regex(/[A-Z]/, 'パスワードには英大文字を含めてください')
+      .regex(/[0-9]/, 'パスワードには数字を含めてください'),
+    newPasswordConfirmation: z.string().min(1, '新しいパスワード（確認）を入力してください'),
+  })
+  .refine((data) => data.newPassword === data.newPasswordConfirmation, {
+    message: 'パスワードが一致しません',
+    path: ['newPasswordConfirmation'],
+  });
+export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;

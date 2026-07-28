@@ -1,5 +1,8 @@
+import * as path from 'node:path';
 import * as cdk from 'aws-cdk-lib';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import type { Construct } from 'constructs';
 
 // This domain identity already exists and is verified in SES (set up outside this repo, for
@@ -11,6 +14,10 @@ const SENDER_EMAIL = `sender@${SENDER_DOMAIN}`;
 
 export interface AuthStackProps extends cdk.StackProps {
   readonly stage: 'dev' | 'prod';
+  /** Base URL of the frontend (e.g. the Amplify app domain), used to build the reset-password
+   *  link embedded in the CustomMessage_ForgotPassword email. Passed through to the
+   *  CustomMessage trigger Lambda as FRONTEND_BASE_URL. */
+  readonly frontendBaseUrl?: string;
 }
 
 /**
@@ -70,6 +77,26 @@ export class AuthStack extends cdk.Stack {
         sesVerifiedDomain: SENDER_DOMAIN,
       }),
     });
+
+    // Customizes the CustomMessage_ForgotPassword email to embed the confirmation code in a
+    // reset-password link (${FRONTEND_BASE_URL}/reset-password?email=...&code=...) instead of
+    // Cognito's default plain-code email. See apps/backend/src/handlers/customMessage.ts.
+    const customMessageFn = new NodejsFunction(this, 'customMessageFn', {
+      entry: path.join(__dirname, '..', '..', 'apps', 'backend', 'src', 'handlers', 'customMessage.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_22_X,
+      architecture: lambda.Architecture.ARM_64,
+      memorySize: 256,
+      timeout: cdk.Duration.seconds(10),
+      environment: {
+        FRONTEND_BASE_URL: props.frontendBaseUrl ?? '',
+      },
+      bundling: {
+        minify: true,
+        target: 'node22',
+      },
+    });
+    this.userPool.addTrigger(cognito.UserPoolOperation.CUSTOM_MESSAGE, customMessageFn);
 
     this.userPoolClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
       userPool: this.userPool,

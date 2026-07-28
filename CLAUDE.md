@@ -16,7 +16,7 @@
 - グラフ: Recharts（日/週/月推移、費目別ピボット、予実差）
 - データフェッチ: TanStack Query
 - フォーム: React Hook Form + Zod
-- ホスティング: AWS Amplify Hosting（デフォルトドメイン運用、独自ドメインは取得しない）
+- ホスティング: AWS Amplify Hosting。カスタムドメイン `https://household.minatoproject.com`（SES送信ドメイン`minatoproject.com`のサブドメイン）を使用。ただしこのカスタムドメイン紐付け（Route 53 / ACM証明書 / Amplifyドメイン設定）は本リポジトリのCDK（`infra/lib/hosting-stack.ts`）では一切管理しておらず、リポジトリ外（Amplifyコンソール等）で設定済みのものを前提としている点に注意
 
 ### バックエンド
 - API Gateway (HTTP API) + AWS Lambda（Node.js 22.x / TypeScript）
@@ -78,11 +78,13 @@ pnpmワークスペース（`pnpm-workspace.yaml`）。ルート`package.json`�
 
 - バックエンド: 費目（カテゴリ）・取引・予算・集計（推移/費目別ピボット/予実差）のCRUD・集計エンドポイントを実装済み（DynamoDB連携・監査ログ込み、`pnpm --filter @household/backend test`で全ユニットテスト green）。退会（`POST /users/me/withdraw`）も論理削除（`status: pendingDeletion`への遷移、`deletionScheduledAt`記録）まで実装済み
   - 未着手の既知ギャップ: 退会の**物理削除バッチ**（`deletionScheduledAt`経過後にDynamoDB項目を実削除するEventBridge + Lambdaのスケジュール実行）は未実装。着手時に追加すること
+  - パスワードリセット（`apps/backend/src/handlers/customMessage.ts`）実装済み。Cognitoの`CustomMessage`トリガーとして、`triggerSource === 'CustomMessage_ForgotPassword'`のときのみメール本文を差し替え、確認コードを`${FRONTEND_BASE_URL}/reset-password?email=...&code=...`のリンクに埋め込む。他のtriggerSource（サインアップ確認等）はデフォルトテンプレートのまま。他の認証系機能と同様バックエンドAPIは経由せず、フロントは`ConfirmForgotPassword`をCognitoに直接呼ぶ
 - フロントエンド:
   - 費目・取引・予算・退会はすべて実バックエンドAPIに配線済み（`src/lib/categories.ts` / `transactions.ts` / `budgets.ts` / `account.ts`、いずれも`apiFetch`経由）。localStorageモック（`local-store.ts`）は削除済み
   - ダッシュボードの集計（収支推移・資産形成推移・予実差）は`src/lib/aggregate.ts`によるクライアント側計算のまま。バックエンドの`/aggregation/*`エンドポイントは実装済みだがフロントからはまだ未使用（既知の積み残し。切り替える場合は取引・予算の全件取得をやめてこのエンドポイントを叩く形に変更する）
   - 認証: `amazon-cognito-identity-js`でCognito User Poolに直接連携（サインアップ→確認コード→ログイン→ログアウト）を実装済み（`src/lib/auth.ts`）。バックエンドを経由しない設計（`/auth/*`エンドポイントは存在しない、CLAUDE.mdの方針どおり）。退会だけは例外的にバックエンドAPI（`POST /users/me/withdraw`）を叩く（`src/lib/account.ts`。`auth.ts`に置くと`api.ts`との循環importになるため分離）
   - 設定画面でのメールアドレス変更も実装済み（`SettingsPage.tsx`、`src/lib/auth.ts`の`requestEmailChange`/`confirmEmailChange`）。認証と同様バックエンドを経由せずCognitoに直接連携し、User Poolの`keepOriginal.email`設定（`infra/lib/auth-stack.ts`）により新アドレス宛の確認コード検証が完了するまで実際のメール属性は変わらない。バックエンドのDynamoDBはメールアドレスをキャッシュしていない（退会時にJWTクレームから都度読むのみ）ため、この変更に追随するバックエンド側の対応は不要
+  - パスワードリセット実装済み（`src/pages/ResetPasswordPage.tsx`、`src/lib/auth.ts`の`forgotPassword`/`confirmForgotPassword`）。ログイン画面から遷移し、URLに`email`/`code`クエリパラメータが無ければメールアドレス入力フォーム（Cognito`ForgotPassword`を呼びメール送信）、両方あれば新パスワード入力フォーム（Cognito`ConfirmForgotPassword`を呼ぶ）を出し分ける。リンクの有効期限はCognito標準の固定値に依存しており、本プロジェクト側で短縮する仕組みは持たない（UI文言でも具体的な分数は明記していない）
   - ルート保護実装済み（未ログイン時はDashboard等から`/login`へリダイレクト、`src/components/auth/RequireAuth.tsx`）
   - 追加env: `VITE_COGNITO_USER_POOL_ID` / `VITE_COGNITO_CLIENT_ID` / `VITE_API_BASE_URL`（`Household-prod-Auth`/`Household-prod-Api`スタックの出力値。`apps/frontend/.env`に設定済み、gitignore対象）
   - prod環境の実APIに対して`GET /categories`が認証なしで401を返すことを確認済み（疎通そのものはOK）。実際のサインアップ〜ログイン〜画面操作のブラウザでの動作確認はまだ行っていない
@@ -93,3 +95,4 @@ pnpmワークスペース（`pnpm-workspace.yaml`）。ルート`package.json`�
   - Amplifyのビルド環境変数（`VITE_API_BASE_URL`/`VITE_COGNITO_USER_POOL_ID`/`VITE_COGNITO_CLIENT_ID`）は`infra/lib/hosting-stack.ts`の`amplify.App`の`environmentVariables`でAuth/Apiスタックからクロススタック参照して注入（`bin/app.ts`でHostingStackにuserPoolId/userPoolClientId/apiEndpointを渡す構成。開発者ローカルの`.env`はgitignore対象でCodeBuild環境には見えないため、ここで明示的に渡さないとフロントが「認証設定が未構成です」のまま本番ビルドされる — 実際にこれで一度ハマって修正した）
   - 動作確認用に手動ビルド（`aws amplify start-job`）を実行しSUCCEED、Amplifyの`https://master.<appId>.amplifyapp.com/`（`aws amplify list-apps`で確認）のJSバンドルに実際のUser Pool IDが埋め込まれていることまで確認済み。以後はmasterへのpushで自動ビルド（**注意**: モノレポ構成だがAmplify Gen1にパスベースのビルドスキップ機能は無く、`apps/backend`や`infra`だけの変更でも毎回フロントのビルドが走る。実害は小さいので現状放置）。実ブラウザでのサインアップ〜ログイン操作自体はまだ未検証
   - アラート通知先メール（`alertEmail`）は未設定のまま（コンテキストパラメータが空文字）
+  - パスワードリセット機能用に、Cognito User Poolへ`CustomMessage`トリガー（`customMessageFn`、`infra/lib/auth-stack.ts`）を追加済み。メールリンクに埋め込むフロントエンドURLは`infra/cdk.json`の`context.frontendBaseUrl`（`https://household.minatoproject.com`）から`AuthStack`経由でLambdaの環境変数`FRONTEND_BASE_URL`に注入している。`HostingStack`の出力に依存すると`Auth→Api→Hosting`の依存順と循環するため、あえてコンテキストパラメータ（`alertEmail`/`amplifyGithubRepoUrl`と同じパターン）で受け渡す設計にした

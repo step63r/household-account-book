@@ -17,6 +17,7 @@ if (stageContext !== undefined && stageContext !== 'dev' && stageContext !== 'pr
 // (`cdk deploy -c stage=prod ...`) so nobody accidentally deploys to prod via a stale shell env.
 const alertEmail: string | undefined = app.node.tryGetContext('alertEmail') || undefined;
 const amplifyGithubRepoUrl: string | undefined = app.node.tryGetContext('amplifyGithubRepoUrl') || undefined;
+const frontendBaseUrl: string | undefined = app.node.tryGetContext('frontendBaseUrl') || undefined;
 
 // Same account/region for every stack in a stage; account/region are only known at synth/deploy
 // time via the default AWS CLI environment, never hardcoded here.
@@ -27,7 +28,7 @@ const env: cdk.Environment = {
 
 const stackNamePrefix = `Household-${stage}`;
 
-const authStack = new AuthStack(app, `${stackNamePrefix}-Auth`, { stage, env });
+const authStack = new AuthStack(app, `${stackNamePrefix}-Auth`, { stage, env, frontendBaseUrl });
 
 const dataStack = new DataStack(app, `${stackNamePrefix}-Data`, { stage, env });
 

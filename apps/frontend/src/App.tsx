@@ -9,12 +9,14 @@ import CategoriesPage from '@/pages/CategoriesPage';
 import SettingsPage from '@/pages/SettingsPage';
 import LoginPage from '@/pages/LoginPage';
 import SignupPage from '@/pages/SignupPage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
 
 function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
