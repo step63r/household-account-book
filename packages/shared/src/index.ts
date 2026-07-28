@@ -4,3 +4,4 @@ export * from './transaction';
 export * from './budget';
 export * from './user';
 export * from './aggregation';
+export * from './consent';

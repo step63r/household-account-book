@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { CURRENT_TERMS_VERSION } from '@household/shared';
 import { FakeUserRepository } from '../repository/fakeUserRepository';
-import { requestWithdrawal } from './userService';
+import { getConsentStatus, recordConsent, requestWithdrawal } from './userService';
 
 describe('requestWithdrawal', () => {
   it('creates a pendingDeletion profile with deletionScheduledAt 30 days out', async () => {
@@ -47,6 +48,102 @@ describe('requestWithdrawal', () => {
     const repository = new FakeUserRepository();
 
     await requestWithdrawal(repository, 'user-1', 'user1@example.com');
+
+    await expect(repository.getProfile('user-2')).resolves.toBeUndefined();
+  });
+});
+
+describe('getConsentStatus', () => {
+  it('lazily creates a profile and reports mustAgree for a brand-new user', async () => {
+    const repository = new FakeUserRepository();
+
+    const status = await getConsentStatus(repository, 'user-1', 'user1@example.com');
+
+    expect(status.currentVersion).toBe(CURRENT_TERMS_VERSION);
+    expect(status.termsAgreedVersion).toBeUndefined();
+    expect(status.mustAgree).toBe(true);
+    await expect(repository.getProfile('user-1')).resolves.toMatchObject({
+      id: 'user-1',
+      email: 'user1@example.com',
+      status: 'active',
+    });
+  });
+
+  it('reports mustAgree: false when the stored version matches the current version', async () => {
+    const repository = new FakeUserRepository();
+    await repository.put({
+      id: 'user-1',
+      email: 'user1@example.com',
+      status: 'active',
+      termsAgreedVersion: CURRENT_TERMS_VERSION,
+      termsAgreedAt: '2020-01-01T00:00:00.000Z',
+      createdAt: '2020-01-01T00:00:00.000Z',
+      updatedAt: '2020-01-01T00:00:00.000Z',
+    });
+
+    const status = await getConsentStatus(repository, 'user-1', 'user1@example.com');
+
+    expect(status.mustAgree).toBe(false);
+  });
+
+  it('reports mustAgree: true when the stored version is stale', async () => {
+    const repository = new FakeUserRepository();
+    await repository.put({
+      id: 'user-1',
+      email: 'user1@example.com',
+      status: 'active',
+      termsAgreedVersion: '2020-01-01',
+      termsAgreedAt: '2020-01-01T00:00:00.000Z',
+      createdAt: '2020-01-01T00:00:00.000Z',
+      updatedAt: '2020-01-01T00:00:00.000Z',
+    });
+
+    const status = await getConsentStatus(repository, 'user-1', 'user1@example.com');
+
+    expect(status.mustAgree).toBe(true);
+    expect(status.termsAgreedVersion).toBe('2020-01-01');
+  });
+});
+
+describe('recordConsent', () => {
+  it('stamps CURRENT_TERMS_VERSION and termsAgreedAt, lazily creating a profile if none exists', async () => {
+    const repository = new FakeUserRepository();
+
+    const status = await recordConsent(repository, 'user-1', 'user1@example.com');
+
+    expect(status.termsAgreedVersion).toBe(CURRENT_TERMS_VERSION);
+    expect(status.termsAgreedAt).toBeDefined();
+    expect(status.mustAgree).toBe(false);
+    await expect(repository.getProfile('user-1')).resolves.toMatchObject({
+      id: 'user-1',
+      email: 'user1@example.com',
+      termsAgreedVersion: CURRENT_TERMS_VERSION,
+    });
+  });
+
+  it('preserves existing profile fields (createdAt, status) when recording consent', async () => {
+    const repository = new FakeUserRepository();
+    await repository.put({
+      id: 'user-1',
+      email: 'user1@example.com',
+      status: 'active',
+      createdAt: '2020-01-01T00:00:00.000Z',
+      updatedAt: '2020-01-01T00:00:00.000Z',
+    });
+
+    const status = await recordConsent(repository, 'user-1', 'user1@example.com');
+
+    expect(status.termsAgreedVersion).toBe(CURRENT_TERMS_VERSION);
+    await expect(repository.getProfile('user-1')).resolves.toMatchObject({
+      createdAt: '2020-01-01T00:00:00.000Z',
+      status: 'active',
+    });
+  });
+
+  it('scopes profiles per user', async () => {
+    const repository = new FakeUserRepository();
+
+    await recordConsent(repository, 'user-1', 'user1@example.com');
 
     await expect(repository.getProfile('user-2')).resolves.toBeUndefined();
   });

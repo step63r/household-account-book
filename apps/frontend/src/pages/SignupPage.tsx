@@ -2,36 +2,46 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
 import { MailCheck, Wallet } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import {
   confirmSignUpSchema,
-  emailPasswordSchema,
+  signUpSchema,
   type ConfirmSignUpFormValues,
-  type EmailPasswordFormValues,
+  type SignUpFormValues,
 } from '@/lib/auth-schema';
-import { confirmSignUp, signInWithEmailPassword, signUpWithEmailPassword } from '@/lib/auth';
+import {
+  confirmSignUp,
+  signInWithEmailPassword,
+  signUpWithEmailPassword,
+  type EmailPasswordCredentials,
+} from '@/lib/auth';
+import { LegalContent } from '@/content/legalContent';
+import { recordConsent } from '@/lib/consent';
 
 export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   // サインアップ成功後、Cognito のメール確認コード入力ステップへ進む
   // 確認コード検証後に自動ログインするため、パスワードも一時的に保持しておく
-  const [pendingCredentials, setPendingCredentials] = useState<EmailPasswordFormValues | null>(null);
+  const [pendingCredentials, setPendingCredentials] = useState<EmailPasswordCredentials | null>(null);
 
-  const signUpForm = useForm<EmailPasswordFormValues>({
-    resolver: zodResolver(emailPasswordSchema),
-    defaultValues: { email: '', password: '' },
+  const signUpForm = useForm<SignUpFormValues>({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: { email: '', password: '', agreedToTerms: false },
   });
+  const agreedToTerms = signUpForm.watch('agreedToTerms');
 
   const onSubmitSignUp = signUpForm.handleSubmit(async (values) => {
     setError(null);
     try {
       await signUpWithEmailPassword(values);
-      setPendingCredentials(values);
+      setPendingCredentials({ email: values.email, password: values.password });
     } catch (e) {
       setError(e instanceof Error ? e.message : '新規登録に失敗しました');
     }
@@ -84,8 +94,35 @@ export default function SignupPage() {
                   </FormItem>
                 )}
               />
+              <div className="max-h-48 overflow-y-auto rounded-md border p-3 text-xs">
+                <LegalContent />
+              </div>
+              <FormField
+                control={signUpForm.control}
+                name="agreedToTerms"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-start gap-2">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={(checked) => field.onChange(checked === true)}
+                        />
+                      </FormControl>
+                      <FormLabel className="font-normal">
+                        上記の利用規約およびプライバシーポリシーに同意します
+                      </FormLabel>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" disabled={signUpForm.formState.isSubmitting} className="mt-2">
+              <Button
+                type="submit"
+                disabled={!agreedToTerms || signUpForm.formState.isSubmitting}
+                className="mt-2"
+              >
                 登録する
               </Button>
             </form>
@@ -112,6 +149,7 @@ function ConfirmSignUpForm({
   onBackToSignUp: () => void;
 }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
 
   const confirmForm = useForm<ConfirmSignUpFormValues>({
@@ -131,10 +169,22 @@ function ConfirmSignUpForm({
     // 確認自体は完了しているため、自動ログインに失敗してもログイン画面へ誘導する（登録をやり直させない）
     try {
       await signInWithEmailPassword({ email, password });
-      navigate('/dashboard');
     } catch {
       navigate('/login');
+      return;
     }
+
+    // サインアップ画面で既に同意済みのため、ここで記録しておく。RequireAuth が直後に
+    // 同意状況を再取得して同じ結果を再度問い合わせるのを避けるため、キャッシュへ直接反映する
+    // （失敗しても致命的ではない - 次回 RequireAuth のチェックで /consent に誘導されるだけ）
+    try {
+      const status = await recordConsent();
+      queryClient.setQueryData(['consent-status'], status);
+    } catch {
+      // no-op: 同意記録に失敗しても /consent へのフォールバックで救済される
+    }
+
+    navigate('/dashboard');
   });
 
   return (

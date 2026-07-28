@@ -10,6 +10,7 @@ import SettingsPage from '@/pages/SettingsPage';
 import LoginPage from '@/pages/LoginPage';
 import SignupPage from '@/pages/SignupPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
+import ConsentPage from '@/pages/ConsentPage';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       <Route element={<RequireAuth />}>
+        <Route path="/consent" element={<ConsentPage />} />
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />

@@ -132,6 +132,20 @@ const ROUTES: RouteDef[] = [
     handlerFile: 'withdrawUser',
     dynamoActions: ['dynamodb:GetItem', 'dynamodb:PutItem'],
   },
+  // Terms of Service / Privacy Policy consent (combined single version, packages/shared/src/consent.ts)
+  {
+    method: apigwv2.HttpMethod.GET,
+    path: '/users/me/consent',
+    handlerFile: 'getConsentStatus',
+    // Get = read profile; Put = lazy PROFILE seed on first check (mirrors listCategories' lazy seeding)
+    dynamoActions: ['dynamodb:GetItem', 'dynamodb:PutItem'],
+  },
+  {
+    method: apigwv2.HttpMethod.POST,
+    path: '/users/me/consent',
+    handlerFile: 'recordConsent',
+    dynamoActions: ['dynamodb:GetItem', 'dynamodb:PutItem'],
+  },
 ];
 
 export class ApiStack extends cdk.Stack {

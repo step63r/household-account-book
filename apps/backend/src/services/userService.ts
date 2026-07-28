@@ -1,4 +1,4 @@
-import type { User } from '@household/shared';
+import { CURRENT_TERMS_VERSION, type ConsentStatus, type User } from '@household/shared';
 import type { UserRepository } from '../repository/userRepository';
 
 const DELETION_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000; // CLAUDE.md: 30日程度の猶予期間
@@ -36,4 +36,55 @@ export async function requestWithdrawal(
   };
   await repository.put(user);
   return user;
+}
+
+function toConsentStatus(user: User): ConsentStatus {
+  return {
+    currentVersion: CURRENT_TERMS_VERSION,
+    termsAgreedVersion: user.termsAgreedVersion,
+    termsAgreedAt: user.termsAgreedAt,
+    mustAgree: user.termsAgreedVersion !== CURRENT_TERMS_VERSION,
+  };
+}
+
+function defaultProfile(userId: string, email: string, now: string): User {
+  return { id: userId, email, status: 'active', createdAt: now, updatedAt: now };
+}
+
+/**
+ * 同意状況を返す。プロフィール未作成（新規ユーザーの初回チェック）の場合は
+ * categoryService.listCategories のプリセット遅延投入と同様、ここで PROFILE
+ * アイテムを遅延作成する。termsAgreedVersion が未設定のため mustAgree は
+ * 自動的に true になる（既存ユーザーの「未同意」も同じ表現で扱える）。
+ */
+export async function getConsentStatus(
+  repository: UserRepository,
+  userId: string,
+  email: string,
+): Promise<ConsentStatus> {
+  const existing = await repository.getProfile(userId);
+  if (existing) return toConsentStatus(existing);
+
+  const now = new Date().toISOString();
+  const user = defaultProfile(userId, email, now);
+  await repository.put(user);
+  return toConsentStatus(user);
+}
+
+/** 同意を記録する。バージョンはクライアントから受け取らず、常に CURRENT_TERMS_VERSION を使う。 */
+export async function recordConsent(
+  repository: UserRepository,
+  userId: string,
+  email: string,
+): Promise<ConsentStatus> {
+  const now = new Date().toISOString();
+  const existing = await repository.getProfile(userId);
+  const user: User = {
+    ...(existing ?? defaultProfile(userId, email, now)),
+    termsAgreedVersion: CURRENT_TERMS_VERSION,
+    termsAgreedAt: now,
+    updatedAt: now,
+  };
+  await repository.put(user);
+  return toConsentStatus(user);
 }

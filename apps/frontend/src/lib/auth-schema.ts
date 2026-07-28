@@ -22,6 +22,19 @@ export const emailPasswordSchema = z.object({
 });
 export type EmailPasswordFormValues = z.infer<typeof emailPasswordSchema>;
 
+/**
+ * サインアップフォーム専用スキーマ。emailPasswordSchema はログインフォーム
+ * （LoginPage.tsx）とも共有しているため、そちらを直接拡張すると同意チェックボックスの
+ * 必須バリデーションがログインフォームにも波及してしまう。そのため .extend() で
+ * 別スキーマとして定義する。
+ */
+export const signUpSchema = emailPasswordSchema.extend({
+  agreedToTerms: z.boolean().refine((value) => value === true, {
+    message: '利用規約とプライバシーポリシーへの同意が必要です',
+  }),
+});
+export type SignUpFormValues = z.infer<typeof signUpSchema>;
+
 /** サインアップ後のメール確認コード入力用スキーマ。設定画面のメールアドレス変更確認でも再利用する。 */
 export const confirmSignUpSchema = z.object({
   code: z.string().min(1, '確認コードを入力してください'),

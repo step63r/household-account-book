@@ -13,6 +13,9 @@ export const userSchema = z.object({
   status: userStatusSchema,
   deletionRequestedAt: z.string().datetime().optional(),
   deletionScheduledAt: z.string().datetime().optional(),
+  /** 利用規約・プライバシーポリシー（結合バージョン）に同意済みのバージョン */
+  termsAgreedVersion: z.string().optional(),
+  termsAgreedAt: z.string().datetime().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

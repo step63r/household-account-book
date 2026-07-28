@@ -21,6 +21,8 @@
  *   GET    /aggregation/category-pivot?from=...&to=...                     (未使用)
  *   GET    /aggregation/budget-variance?yearMonth=YYYY-MM                  (未使用)
  *   POST   /users/me/withdraw                               src/lib/account.ts
+ *   GET    /users/me/consent                                src/lib/consent.ts
+ *   POST   /users/me/consent
  *
  * ログイン/サインアップはこの API を経由しない。CLAUDE.md の設計どおり Cognito User Pool
  * に対して直接（Cognito Hosted UI ではなく `amazon-cognito-identity-js` SDK 経由で）認証する
