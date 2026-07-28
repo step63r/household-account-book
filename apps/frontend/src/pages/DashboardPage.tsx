@@ -12,6 +12,7 @@ import { getCategories } from '@/lib/categories';
 import { getBudgets } from '@/lib/budgets';
 import { getTransactions } from '@/lib/transactions';
 import { EMPTY_ARRAY } from '@/lib/utils';
+import { formatYearMonth } from '@/lib/date';
 
 const GRANULARITY_LABEL: Record<TrendGranularity, string> = {
   day: '日次',
@@ -76,7 +77,7 @@ export default function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <TrendChart data={trendData} />
+          <TrendChart data={trendData} granularity={granularity} />
         </CardContent>
       </Card>
 
@@ -84,7 +85,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>予実差（当月・費目別）</CardTitle>
-            <CardDescription>{yearMonth} の予算に対する実績</CardDescription>
+            <CardDescription>{formatYearMonth(yearMonth)} の予算に対する実績</CardDescription>
           </CardHeader>
           <CardContent>
             <BudgetVarianceList rows={varianceRows} />
@@ -97,7 +98,7 @@ export default function DashboardPage() {
             <CardDescription>積立・投資・保険・NISA拠出などの振替のみを集計（収支には含みません）</CardDescription>
           </CardHeader>
           <CardContent>
-            <AssetFormationChart data={assetFormationData} />
+            <AssetFormationChart data={assetFormationData} granularity={granularity} />
           </CardContent>
         </Card>
       </div>

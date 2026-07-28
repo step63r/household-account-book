@@ -49,6 +49,7 @@ import {
   updateTransaction,
 } from '@/lib/transactions';
 import { EMPTY_ARRAY } from '@/lib/utils';
+import { formatDate } from '@/lib/date';
 
 const TYPE_LABEL: Record<TransactionType, string> = {
   income: '収入',
@@ -237,7 +238,7 @@ export default function TransactionsPage() {
                 <tbody>
                   {sortedTransactions.map((tx) => (
                     <tr key={tx.id} className="border-b border-border last:border-0">
-                      <td className="py-2 pr-3 whitespace-nowrap tabular-nums">{tx.date}</td>
+                      <td className="py-2 pr-3 whitespace-nowrap tabular-nums">{formatDate(tx.date)}</td>
                       <td className="py-2 pr-3">
                         <Badge variant={TYPE_BADGE_VARIANT[tx.type]}>{TYPE_LABEL[tx.type]}</Badge>
                       </td>

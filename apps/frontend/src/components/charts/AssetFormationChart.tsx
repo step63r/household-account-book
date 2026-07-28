@@ -7,7 +7,9 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import type { TrendGranularity } from '@household/shared';
 import type { AssetFormationPoint } from '@/lib/aggregate';
+import { formatPeriodLabel, formatPeriodTick } from '@/lib/date';
 
 const yenFormatter = new Intl.NumberFormat('ja-JP', {
   style: 'currency',
@@ -19,17 +21,19 @@ function CustomTooltip({
   active,
   payload,
   label,
+  granularity,
 }: {
   active?: boolean;
   payload?: { value: number }[];
   label?: string;
+  granularity: TrendGranularity;
 }) {
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0];
   if (!point) return null;
   return (
     <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
-      <p className="mb-1 font-medium">{label}</p>
+      <p className="mb-1 font-medium">{label !== undefined ? formatPeriodLabel(label, granularity) : ''}</p>
       <p className="font-medium tabular-nums text-[var(--series-transfer)]">
         {yenFormatter.format(point.value)}
       </p>
@@ -41,7 +45,13 @@ function CustomTooltip({
  * 資産形成推移（積立・投資・保険・NISA拠出などの transfer 種別のみを集計）。
  * 収支推移・予実差とは別枠のグラフとして扱う。
  */
-export function AssetFormationChart({ data }: { data: AssetFormationPoint[] }) {
+export function AssetFormationChart({
+  data,
+  granularity,
+}: {
+  data: AssetFormationPoint[];
+  granularity: TrendGranularity;
+}) {
   if (data.length === 0) {
     return (
       <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
@@ -67,6 +77,7 @@ export function AssetFormationChart({ data }: { data: AssetFormationPoint[] }) {
             tick={{ fill: 'var(--chart-muted)', fontSize: 12 }}
             tickLine={false}
             axisLine={{ stroke: 'var(--chart-axis)' }}
+            tickFormatter={(period: string) => formatPeriodTick(period, granularity)}
           />
           <YAxis
             stroke="var(--chart-axis)"
@@ -76,7 +87,10 @@ export function AssetFormationChart({ data }: { data: AssetFormationPoint[] }) {
             width={56}
             tickFormatter={(v: number) => `${Math.round(v / 1000)}k`}
           />
-          <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--chart-axis)' }} />
+          <Tooltip
+            content={<CustomTooltip granularity={granularity} />}
+            cursor={{ stroke: 'var(--chart-axis)' }}
+          />
           <Area
             type="monotone"
             dataKey="amount"

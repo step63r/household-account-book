@@ -8,7 +8,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { TrendPoint } from '@household/shared';
+import type { TrendGranularity, TrendPoint } from '@household/shared';
+import { formatPeriodLabel, formatPeriodTick } from '@/lib/date';
 
 const yenFormatter = new Intl.NumberFormat('ja-JP', {
   style: 'currency',
@@ -20,15 +21,17 @@ function CustomTooltip({
   active,
   payload,
   label,
+  granularity,
 }: {
   active?: boolean;
   payload?: { name: string; value: number; color: string }[];
   label?: string;
+  granularity: TrendGranularity;
 }) {
   if (!active || !payload || payload.length === 0) return null;
   return (
     <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
-      <p className="mb-1 font-medium">{label}</p>
+      <p className="mb-1 font-medium">{label !== undefined ? formatPeriodLabel(label, granularity) : ''}</p>
       {payload.map((entry) => (
         <p key={entry.name} className="flex items-center gap-2">
           <span
@@ -47,7 +50,13 @@ function CustomTooltip({
 }
 
 /** 日/週/月の収支推移グラフ（income/expense のみ。transfer は含まない） */
-export function TrendChart({ data }: { data: TrendPoint[] }) {
+export function TrendChart({
+  data,
+  granularity,
+}: {
+  data: TrendPoint[];
+  granularity: TrendGranularity;
+}) {
   if (data.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
@@ -67,6 +76,7 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
             tick={{ fill: 'var(--chart-muted)', fontSize: 12 }}
             tickLine={false}
             axisLine={{ stroke: 'var(--chart-axis)' }}
+            tickFormatter={(period: string) => formatPeriodTick(period, granularity)}
           />
           <YAxis
             stroke="var(--chart-axis)"
@@ -76,7 +86,10 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
             width={56}
             tickFormatter={(v: number) => `${Math.round(v / 1000)}k`}
           />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--muted)', opacity: 0.4 }} />
+          <Tooltip
+            content={<CustomTooltip granularity={granularity} />}
+            cursor={{ fill: 'var(--muted)', opacity: 0.4 }}
+          />
           <Legend
             wrapperStyle={{ fontSize: 12, color: 'var(--chart-muted)' }}
             iconType="circle"

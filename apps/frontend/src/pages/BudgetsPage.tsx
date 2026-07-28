@@ -22,6 +22,7 @@ import {
 import { getCategories } from '@/lib/categories';
 import { getBudgets, upsertBudget } from '@/lib/budgets';
 import { EMPTY_ARRAY } from '@/lib/utils';
+import { formatYearMonth } from '@/lib/date';
 
 /** 日本時間の当月（YYYY-MM）。toISOString()はUTC基準になるため使わない
  * （月初〜朝9時のUTC日付が前月にずれる）。 */
@@ -141,8 +142,8 @@ export default function BudgetsPage() {
                 <DialogHeader>
                   <DialogTitle>前月の予算をコピーしますか？</DialogTitle>
                   <DialogDescription>
-                    {previousYearMonth(yearMonth)} の予算を {yearMonth} にコピーして保存します。
-                    現在保存されている {yearMonth} の予算（未保存の変更があれば破棄されます）は上書きされます。
+                    {formatYearMonth(previousYearMonth(yearMonth))} の予算を {formatYearMonth(yearMonth)} にコピーして保存します。
+                    現在保存されている {formatYearMonth(yearMonth)} の予算（未保存の変更があれば破棄されます）は上書きされます。
                   </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
