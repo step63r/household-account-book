@@ -121,6 +121,7 @@ export default function SignupPage() {
               <Button
                 type="submit"
                 disabled={!agreedToTerms || signUpForm.formState.isSubmitting}
+                loading={signUpForm.formState.isSubmitting}
                 className="mt-2"
               >
                 登録する
@@ -219,7 +220,12 @@ function ConfirmSignUpForm({
                 )}
               />
               {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" disabled={confirmForm.formState.isSubmitting} className="mt-2">
+              <Button
+                type="submit"
+                disabled={confirmForm.formState.isSubmitting}
+                loading={confirmForm.formState.isSubmitting}
+                className="mt-2"
+              >
                 確認する
               </Button>
               <Button type="button" variant="ghost" onClick={onBackToSignUp}>

@@ -156,7 +156,13 @@ export default function SettingsPage() {
                     キャンセル
                   </Button>
                 </DialogClose>
-                <Button type="button" variant="destructive" disabled={isSubmitting} onClick={handleWithdraw}>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={isSubmitting}
+                  loading={isSubmitting}
+                  onClick={handleWithdraw}
+                >
                   退会する
                 </Button>
               </DialogFooter>

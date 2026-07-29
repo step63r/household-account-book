@@ -95,7 +95,12 @@ function RequestResetForm() {
                 )}
               />
               {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" disabled={form.formState.isSubmitting} className="mt-2">
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                loading={form.formState.isSubmitting}
+                className="mt-2"
+              >
                 再設定メールを送信する
               </Button>
             </form>
@@ -192,7 +197,12 @@ function SetNewPasswordForm({ email, code }: { email: string; code: string }) {
                 )}
               />
               {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" disabled={form.formState.isSubmitting} className="mt-2">
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                loading={form.formState.isSubmitting}
+                className="mt-2"
+              >
                 パスワードを再設定する
               </Button>
             </form>

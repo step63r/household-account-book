@@ -31,7 +31,6 @@
  * 循環importになるため分離している）。
  */
 import { getCurrentSession } from './auth';
-import { beginGlobalLoading } from './loading-store';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
@@ -86,34 +85,25 @@ export async function apiFetch<TResponse>(
     }
   }
 
-  // GET（一覧取得など）はページ表示のたびに走るため、書き込み系リクエストのみを
-  // グローバルローディングオーバーレイの対象にする。
-  const method = (rest.method ?? 'GET').toString().toUpperCase();
-  const endLoading = method === 'GET' ? null : beginGlobalLoading();
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...rest,
+    headers: requestHeaders,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
 
-  try {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      ...rest,
-      headers: requestHeaders,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-
-    if (!response.ok) {
-      let parsedBody: unknown;
-      try {
-        parsedBody = await response.json();
-      } catch {
-        parsedBody = undefined;
-      }
-      throw new ApiError(response.status, `API request failed: ${response.status}`, parsedBody);
+  if (!response.ok) {
+    let parsedBody: unknown;
+    try {
+      parsedBody = await response.json();
+    } catch {
+      parsedBody = undefined;
     }
-
-    if (response.status === 204) {
-      return undefined as TResponse;
-    }
-
-    return (await response.json()) as TResponse;
-  } finally {
-    endLoading?.();
+    throw new ApiError(response.status, `API request failed: ${response.status}`, parsedBody);
   }
+
+  if (response.status === 204) {
+    return undefined as TResponse;
+  }
+
+  return (await response.json()) as TResponse;
 }

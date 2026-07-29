@@ -118,7 +118,11 @@ export function ChangeEmailDialog({
               />
               {error && <p className="text-sm text-destructive">{error}</p>}
               <DialogFooter>
-                <Button type="submit" disabled={requestForm.formState.isSubmitting}>
+                <Button
+                  type="submit"
+                  disabled={requestForm.formState.isSubmitting}
+                  loading={requestForm.formState.isSubmitting}
+                >
                   確認コードを送信
                 </Button>
               </DialogFooter>
@@ -145,7 +149,11 @@ export function ChangeEmailDialog({
                 <Button type="button" variant="ghost" onClick={backToRequest}>
                   メールアドレスを変更し直す
                 </Button>
-                <Button type="submit" disabled={confirmForm.formState.isSubmitting}>
+                <Button
+                  type="submit"
+                  disabled={confirmForm.formState.isSubmitting}
+                  loading={confirmForm.formState.isSubmitting}
+                >
                   確認する
                 </Button>
               </DialogFooter>

@@ -79,7 +79,12 @@ export default function ConsentPage() {
           <Button type="button" variant="outline" onClick={handleLogout}>
             ログアウト
           </Button>
-          <Button type="button" disabled={!agreed || isSubmitting} onClick={handleAgree}>
+          <Button
+            type="button"
+            disabled={!agreed || isSubmitting}
+            loading={isSubmitting}
+            onClick={handleAgree}
+          >
             同意して続ける
           </Button>
         </CardFooter>

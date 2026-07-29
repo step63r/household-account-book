@@ -154,6 +154,7 @@ export default function BudgetsPage() {
                     type="button"
                     onClick={() => copyMutation.mutate()}
                     disabled={copyMutation.isPending}
+                    loading={copyMutation.isPending}
                   >
                     コピーする
                   </Button>
@@ -161,7 +162,11 @@ export default function BudgetsPage() {
               </DialogContent>
             </Dialog>
 
-            <Button type="submit" disabled={saveMutation.isPending || categories.length === 0}>
+            <Button
+              type="submit"
+              disabled={saveMutation.isPending || categories.length === 0}
+              loading={saveMutation.isPending}
+            >
               予算を保存
             </Button>
           </div>

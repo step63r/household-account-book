@@ -540,11 +540,17 @@ function TransactionFormDialog({
 
           <DialogFooter>
             {transaction ? null : (
-              <Button type="button" variant="outline" onClick={handleContinuousSubmit} disabled={pending}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleContinuousSubmit}
+                disabled={pending}
+                loading={pending}
+              >
                 連続登録する
               </Button>
             )}
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending} loading={pending}>
               {transaction ? '更新する' : '登録する'}
             </Button>
           </DialogFooter>

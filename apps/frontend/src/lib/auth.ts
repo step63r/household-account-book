@@ -27,8 +27,6 @@ import {
   type CognitoUserSession,
 } from 'amazon-cognito-identity-js';
 
-import { beginGlobalLoading } from './loading-store';
-
 export type EmailPasswordCredentials = {
   email: string;
   password: string;
@@ -86,64 +84,49 @@ function describeCognitoError(error: unknown, fallback: string): string {
 
 /** Cognito `signUp`。デフォルトでメール確認コードの入力が必須のため、成功後は `confirmSignUp` を呼ぶ想定。 */
 export async function signUpWithEmailPassword({ email, password }: EmailPasswordCredentials): Promise<void> {
-  const endLoading = beginGlobalLoading();
-  try {
-    const pool = getUserPool();
-    const attributeList = [new CognitoUserAttribute({ Name: 'email', Value: email })];
+  const pool = getUserPool();
+  const attributeList = [new CognitoUserAttribute({ Name: 'email', Value: email })];
 
-    await new Promise<void>((resolve, reject) => {
-      pool.signUp(email, password, attributeList, [], (err) => {
-        if (err) {
-          reject(new Error(describeCognitoError(err, '新規登録に失敗しました')));
-          return;
-        }
-        resolve();
-      });
+  await new Promise<void>((resolve, reject) => {
+    pool.signUp(email, password, attributeList, [], (err) => {
+      if (err) {
+        reject(new Error(describeCognitoError(err, '新規登録に失敗しました')));
+        return;
+      }
+      resolve();
     });
-  } finally {
-    endLoading();
-  }
+  });
 }
 
 /** サインアップ時にメールで届く確認コードを検証する。成功するとログイン可能になる。 */
 export async function confirmSignUp({ email, code }: ConfirmSignUpInput): Promise<void> {
-  const endLoading = beginGlobalLoading();
-  try {
-    const user = getCognitoUser(email);
+  const user = getCognitoUser(email);
 
-    await new Promise<void>((resolve, reject) => {
-      user.confirmRegistration(code, true, (err) => {
-        if (err) {
-          reject(new Error(describeCognitoError(err, '確認コードの検証に失敗しました')));
-          return;
-        }
-        resolve();
-      });
+  await new Promise<void>((resolve, reject) => {
+    user.confirmRegistration(code, true, (err) => {
+      if (err) {
+        reject(new Error(describeCognitoError(err, '確認コードの検証に失敗しました')));
+        return;
+      }
+      resolve();
     });
-  } finally {
-    endLoading();
-  }
+  });
 }
 
 /** Cognito `authenticateUser`（SRP 認証）。成功すると SDK がセッションを永続化し、`getAuthToken` から参照できるようになる。 */
 export async function signInWithEmailPassword({ email, password }: EmailPasswordCredentials): Promise<void> {
-  const endLoading = beginGlobalLoading();
-  try {
-    const user = getCognitoUser(email);
-    const authenticationDetails = new AuthenticationDetails({ Username: email, Password: password });
+  const user = getCognitoUser(email);
+  const authenticationDetails = new AuthenticationDetails({ Username: email, Password: password });
 
-    await new Promise<void>((resolve, reject) => {
-      user.authenticateUser(authenticationDetails, {
-        onSuccess: () => resolve(),
-        onFailure: (err) => reject(new Error(describeCognitoError(err, 'ログインに失敗しました'))),
-        newPasswordRequired: () => {
-          reject(new Error('初回パスワードの変更が必要です。管理者にお問い合わせください。'));
-        },
-      });
+  await new Promise<void>((resolve, reject) => {
+    user.authenticateUser(authenticationDetails, {
+      onSuccess: () => resolve(),
+      onFailure: (err) => reject(new Error(describeCognitoError(err, 'ログインに失敗しました'))),
+      newPasswordRequired: () => {
+        reject(new Error('初回パスワードの変更が必要です。管理者にお問い合わせください。'));
+      },
     });
-  } finally {
-    endLoading();
-  }
+  });
 }
 
 /**
@@ -152,19 +135,14 @@ export async function signInWithEmailPassword({ email, password }: EmailPassword
  * 未ログイン状態で呼ばれるため `getAuthenticatedUser` は使わず `getCognitoUser` を直接使う。
  */
 export async function forgotPassword(email: string): Promise<void> {
-  const endLoading = beginGlobalLoading();
-  try {
-    const user = getCognitoUser(email);
+  const user = getCognitoUser(email);
 
-    await new Promise<void>((resolve, reject) => {
-      user.forgotPassword({
-        onSuccess: () => resolve(),
-        onFailure: (err) => reject(new Error(describeCognitoError(err, 'パスワード再設定の受付に失敗しました'))),
-      });
+  await new Promise<void>((resolve, reject) => {
+    user.forgotPassword({
+      onSuccess: () => resolve(),
+      onFailure: (err) => reject(new Error(describeCognitoError(err, 'パスワード再設定の受付に失敗しました'))),
     });
-  } finally {
-    endLoading();
-  }
+  });
 }
 
 export type ConfirmForgotPasswordInput = {
@@ -179,19 +157,14 @@ export async function confirmForgotPassword({
   code,
   newPassword,
 }: ConfirmForgotPasswordInput): Promise<void> {
-  const endLoading = beginGlobalLoading();
-  try {
-    const user = getCognitoUser(email);
+  const user = getCognitoUser(email);
 
-    await new Promise<void>((resolve, reject) => {
-      user.confirmPassword(code, newPassword, {
-        onSuccess: () => resolve(),
-        onFailure: (err) => reject(new Error(describeCognitoError(err, 'パスワードの再設定に失敗しました'))),
-      });
+  await new Promise<void>((resolve, reject) => {
+    user.confirmPassword(code, newPassword, {
+      onSuccess: () => resolve(),
+      onFailure: (err) => reject(new Error(describeCognitoError(err, 'パスワードの再設定に失敗しました'))),
     });
-  } finally {
-    endLoading();
-  }
+  });
 }
 
 /** ログアウト。ローカルに保存されたセッション情報を破棄する（Cognito 側の失効はしない `signOut`）。 */
@@ -245,67 +218,52 @@ export async function getCurrentSession(): Promise<CognitoUserSession | null> {
  * （User Pool の `keepOriginal.email` 設定による。infra/lib/auth-stack.ts 参照）。
  */
 export async function requestEmailChange(newEmail: string): Promise<void> {
-  const endLoading = beginGlobalLoading();
-  try {
-    const authenticated = await getAuthenticatedUser();
-    if (!authenticated) {
-      throw new Error('ログインしていません');
-    }
-    const attribute = new CognitoUserAttribute({ Name: 'email', Value: newEmail });
-
-    await new Promise<void>((resolve, reject) => {
-      authenticated.user.updateAttributes([attribute], (err) => {
-        if (err) {
-          reject(new Error(describeCognitoError(err, 'メールアドレスの変更に失敗しました')));
-          return;
-        }
-        resolve();
-      });
-    });
-  } finally {
-    endLoading();
+  const authenticated = await getAuthenticatedUser();
+  if (!authenticated) {
+    throw new Error('ログインしていません');
   }
+  const attribute = new CognitoUserAttribute({ Name: 'email', Value: newEmail });
+
+  await new Promise<void>((resolve, reject) => {
+    authenticated.user.updateAttributes([attribute], (err) => {
+      if (err) {
+        reject(new Error(describeCognitoError(err, 'メールアドレスの変更に失敗しました')));
+        return;
+      }
+      resolve();
+    });
+  });
 }
 
 /** `requestEmailChange` で新アドレスに送られた確認コードを検証し、メールアドレス変更を完了する。 */
 export async function confirmEmailChange(code: string): Promise<void> {
-  const endLoading = beginGlobalLoading();
-  try {
-    const authenticated = await getAuthenticatedUser();
-    if (!authenticated) {
-      throw new Error('ログインしていません');
-    }
-
-    await new Promise<void>((resolve, reject) => {
-      authenticated.user.verifyAttribute('email', code, {
-        onSuccess: () => resolve(),
-        onFailure: (err) => reject(new Error(describeCognitoError(err, '確認コードの検証に失敗しました'))),
-      });
-    });
-  } finally {
-    endLoading();
+  const authenticated = await getAuthenticatedUser();
+  if (!authenticated) {
+    throw new Error('ログインしていません');
   }
+
+  await new Promise<void>((resolve, reject) => {
+    authenticated.user.verifyAttribute('email', code, {
+      onSuccess: () => resolve(),
+      onFailure: (err) => reject(new Error(describeCognitoError(err, '確認コードの検証に失敗しました'))),
+    });
+  });
 }
 
 /** ログイン中ユーザーのパスワードを変更する。1ステップで完結し、成功後も既存セッションは失効しない。 */
 export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
-  const endLoading = beginGlobalLoading();
-  try {
-    const authenticated = await getAuthenticatedUser();
-    if (!authenticated) {
-      throw new Error('ログインしていません');
-    }
-
-    await new Promise<void>((resolve, reject) => {
-      authenticated.user.changePassword(oldPassword, newPassword, (err) => {
-        if (err) {
-          reject(new Error(describeCognitoError(err, 'パスワードの変更に失敗しました')));
-          return;
-        }
-        resolve();
-      });
-    });
-  } finally {
-    endLoading();
+  const authenticated = await getAuthenticatedUser();
+  if (!authenticated) {
+    throw new Error('ログインしていません');
   }
+
+  await new Promise<void>((resolve, reject) => {
+    authenticated.user.changePassword(oldPassword, newPassword, (err) => {
+      if (err) {
+        reject(new Error(describeCognitoError(err, 'パスワードの変更に失敗しました')));
+        return;
+      }
+      resolve();
+    });
+  });
 }

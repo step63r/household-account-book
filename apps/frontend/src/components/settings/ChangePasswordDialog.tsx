@@ -106,7 +106,11 @@ export function ChangePasswordDialog({ onSuccess }: { onSuccess: (message: strin
             />
             {error && <p className="text-sm text-destructive">{error}</p>}
             <DialogFooter>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                loading={form.formState.isSubmitting}
+              >
                 変更する
               </Button>
             </DialogFooter>

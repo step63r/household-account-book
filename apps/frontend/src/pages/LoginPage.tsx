@@ -68,7 +68,12 @@ export default function LoginPage() {
                 )}
               />
               {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" disabled={form.formState.isSubmitting} className="mt-2">
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                loading={form.formState.isSubmitting}
+                className="mt-2"
+              >
                 ログイン
               </Button>
             </form>

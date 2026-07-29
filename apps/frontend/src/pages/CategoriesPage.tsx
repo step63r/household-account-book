@@ -266,7 +266,7 @@ function CategoryFormDialog({
             )}
           />
           <DialogFooter>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending} loading={pending}>
               保存する
             </Button>
           </DialogFooter>
