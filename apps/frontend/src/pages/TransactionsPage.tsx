@@ -354,8 +354,11 @@ function TransactionFormDialog({
     isCustomIncomeSource(transaction?.incomeSource ?? ''),
   );
 
+  const [pendingAction, setPendingAction] = useState<'submit' | 'continuous' | null>(null);
+
   const handleSubmit = form.handleSubmit((values) => {
     const input = buildTransactionInput(values);
+    setPendingAction('submit');
     if (transaction) {
       updateMutation.mutate({ id: transaction.id, input }, { onSuccess: () => onOpenChange(false) });
     } else {
@@ -365,6 +368,7 @@ function TransactionFormDialog({
 
   const handleContinuousSubmit = form.handleSubmit((values) => {
     const input = buildTransactionInput(values);
+    setPendingAction('continuous');
     createMutation.mutate(input, {
       onSuccess: () => {
         form.reset({ ...form.getValues(), amount: NaN, memo: '' });
@@ -545,12 +549,12 @@ function TransactionFormDialog({
                 variant="outline"
                 onClick={handleContinuousSubmit}
                 disabled={pending}
-                loading={pending}
+                loading={pending && pendingAction === 'continuous'}
               >
                 連続登録する
               </Button>
             )}
-            <Button type="submit" disabled={pending} loading={pending}>
+            <Button type="submit" disabled={pending} loading={pending && pendingAction === 'submit'}>
               {transaction ? '更新する' : '登録する'}
             </Button>
           </DialogFooter>
