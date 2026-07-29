@@ -56,7 +56,7 @@ describe('getTrend', () => {
     await expect(getTrend(repository, 'user-1', {})).rejects.toThrow(ZodError);
   });
 
-  it('excludes transfer transactions and sums income/expense per day', async () => {
+  it('excludes transfer from income/expense but sums it separately per day', async () => {
     const repository = new FakeTransactionRepository();
     await repository.put(makeTransaction({ date: '2026-07-10', type: 'income', amount: 5000, categoryId: null }));
     await repository.put(makeTransaction({ date: '2026-07-10', type: 'expense', amount: 1200, categoryId: 'c1' }));
@@ -68,7 +68,7 @@ describe('getTrend', () => {
       to: '2026-07-31',
     });
 
-    expect(trend).toEqual([{ period: '2026-07-10', income: 5000, expense: 1200 }]);
+    expect(trend).toEqual([{ period: '2026-07-10', income: 5000, expense: 1200, transfer: 10000 }]);
   });
 
   it('buckets by month when granularity is month', async () => {
@@ -82,7 +82,7 @@ describe('getTrend', () => {
       to: '2026-07-31',
     });
 
-    expect(trend).toEqual([{ period: '2026-07', income: 0, expense: 3000 }]);
+    expect(trend).toEqual([{ period: '2026-07', income: 0, expense: 3000, transfer: 0 }]);
   });
 
   it('buckets by ISO week when granularity is week', async () => {
@@ -97,7 +97,37 @@ describe('getTrend', () => {
       to: '2026-07-31',
     });
 
-    expect(trend).toEqual([{ period: '2026-W28', income: 0, expense: 1200 }]);
+    expect(trend).toEqual([{ period: '2026-W28', income: 0, expense: 1200, transfer: 0 }]);
+  });
+
+  it('buckets by year when granularity is year', async () => {
+    const repository = new FakeTransactionRepository();
+    await repository.put(makeTransaction({ date: '2026-02-01', type: 'expense', amount: 1000, categoryId: 'c1' }));
+    await repository.put(makeTransaction({ date: '2026-11-15', type: 'income', amount: 3000, categoryId: null }));
+
+    const trend = await getTrend(repository, 'user-1', {
+      granularity: 'year',
+      from: '2026-01-01',
+      to: '2026-12-31',
+    });
+
+    expect(trend).toEqual([{ period: '2026', income: 3000, expense: 1000, transfer: 0 }]);
+  });
+
+  it('resolves the full history when from is omitted', async () => {
+    const repository = new FakeTransactionRepository();
+    await repository.put(makeTransaction({ date: '2010-01-05', type: 'expense', amount: 1500, categoryId: 'c1' }));
+    await repository.put(makeTransaction({ date: '2026-07-10', type: 'income', amount: 2500, categoryId: null }));
+
+    const trend = await getTrend(repository, 'user-1', {
+      granularity: 'month',
+      to: '2026-12-31',
+    });
+
+    expect(trend).toEqual([
+      { period: '2010-01', income: 0, expense: 1500, transfer: 0 },
+      { period: '2026-07', income: 2500, expense: 0, transfer: 0 },
+    ]);
   });
 });
 
@@ -203,5 +233,27 @@ describe('getBudgetVariance', () => {
       ]),
     );
     expect(rows).toHaveLength(3);
+  });
+
+  it('sorts fixed categories before variable, then by sortOrder, with unclassified rows last', async () => {
+    const transactionRepository = new FakeTransactionRepository();
+    const budgetRepository = new FakeBudgetRepository();
+    const categoryRepository = new FakeCategoryRepository();
+    // Alphabetical-by-name order would be: 家賃(house rent) < 食費(food) < 通信費(comms) < 未分類.
+    // The expected order (fixed before variable, then sortOrder) is: 家賃(fixed,0) < 通信費(variable,0)
+    // < 食費(variable,1) < 未分類(missing, last).
+    await categoryRepository.put(makeCategory({ id: 'c-rent', name: '家賃', type: 'fixed', sortOrder: 0 }));
+    await categoryRepository.put(makeCategory({ id: 'c-comms', name: '通信費', type: 'variable', sortOrder: 0 }));
+    await categoryRepository.put(makeCategory({ id: 'c-food', name: '食費', type: 'variable', sortOrder: 1 }));
+    await budgetRepository.put(makeBudget({ yearMonth: '2026-07', categoryId: 'c-rent', amount: 80000 }));
+    await budgetRepository.put(makeBudget({ yearMonth: '2026-07', categoryId: 'c-comms', amount: 8000 }));
+    await budgetRepository.put(makeBudget({ yearMonth: '2026-07', categoryId: 'c-food', amount: 30000 }));
+    await budgetRepository.put(makeBudget({ yearMonth: '2026-07', categoryId: 'missing-category', amount: 5000 }));
+
+    const rows = await getBudgetVariance(transactionRepository, budgetRepository, categoryRepository, 'user-1', {
+      yearMonth: '2026-07',
+    });
+
+    expect(rows.map((row) => row.categoryId)).toEqual(['c-rent', 'c-comms', 'c-food', 'missing-category']);
   });
 });

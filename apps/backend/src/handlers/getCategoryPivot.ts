@@ -10,7 +10,7 @@ const transactionRepository = new DynamoTransactionRepository();
 const categoryRepository = new DynamoCategoryRepository();
 
 /**
- * GET /aggregation/category-pivot?from=YYYY-MM-DD&to=YYYY-MM-DD&granularity=day|week|month
+ * GET /aggregation/category-pivot?from=YYYY-MM-DD&to=YYYY-MM-DD&granularity=day|week|month|year
  * 費目別ピボット（expenseのみ）。granularity省略時は 'month'。
  */
 export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {

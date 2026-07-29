@@ -1,12 +1,7 @@
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import type { BudgetVarianceRow } from '@household/shared';
+import { formatYen } from '@/lib/format';
 import { Skeleton } from '@/components/ui/skeleton';
-
-const yenFormatter = new Intl.NumberFormat('ja-JP', {
-  style: 'currency',
-  currency: 'JPY',
-  maximumFractionDigits: 0,
-});
 
 /** 予実差の表示エリア（費目別、当月）。バー(メーター)+ステータス色で over/under を示す。 */
 export function BudgetVarianceList({
@@ -54,7 +49,7 @@ export function BudgetVarianceList({
             <div className="flex items-baseline justify-between gap-2 text-sm">
               <span className="font-medium">{row.categoryName}</span>
               <span className="flex items-center gap-1 tabular-nums text-muted-foreground">
-                {yenFormatter.format(row.actualAmount)} / {yenFormatter.format(row.budgetAmount)}
+                {formatYen(row.actualAmount)} / {formatYen(row.budgetAmount)}
               </span>
             </div>
             <div
@@ -84,7 +79,7 @@ export function BudgetVarianceList({
                 style={{ color: isOverBudget ? 'var(--status-critical)' : 'var(--status-good)' }}
               >
                 {isOverBudget ? '+' : ''}
-                {yenFormatter.format(row.varianceAmount)}
+                {formatYen(row.varianceAmount)}
               </span>
               <span className="text-muted-foreground">{isOverBudget ? '予算超過' : '予算内'}</span>
             </div>

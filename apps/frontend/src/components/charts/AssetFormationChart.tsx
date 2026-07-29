@@ -7,54 +7,49 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { TrendGranularity } from '@household/shared';
-import type { AssetFormationPoint } from '@/lib/aggregate';
-import { formatPeriodLabel, formatPeriodTick } from '@/lib/date';
+import { formatYearMonth } from '@/lib/date';
+import { formatManYenTick, formatYen } from '@/lib/format';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const TREND_SKELETON_HEIGHTS = [35, 45, 55, 70, 85];
 
-const yenFormatter = new Intl.NumberFormat('ja-JP', {
-  style: 'currency',
-  currency: 'JPY',
-  maximumFractionDigits: 0,
-});
+/** 資産形成推移グラフのデータ点。period は常に月次（YYYY-MM）、amount は累計額。 */
+export type CumulativeAssetPoint = {
+  period: string;
+  amount: number;
+};
 
 function CustomTooltip({
   active,
   payload,
   label,
-  granularity,
 }: {
   active?: boolean;
   payload?: { value: number }[];
   label?: string;
-  granularity: TrendGranularity;
 }) {
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0];
   if (!point) return null;
   return (
     <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
-      <p className="mb-1 font-medium">{label !== undefined ? formatPeriodLabel(label, granularity) : ''}</p>
+      <p className="mb-1 font-medium">{label !== undefined ? formatYearMonth(label) : ''}</p>
       <p className="font-medium tabular-nums text-[var(--series-transfer)]">
-        {yenFormatter.format(point.value)}
+        {formatYen(point.value)}
       </p>
     </div>
   );
 }
 
 /**
- * 資産形成推移（積立・投資・保険・NISA拠出などの transfer 種別のみを集計）。
+ * 資産形成推移（積立・投資・保険・NISA拠出などの transfer 種別のみを集計、月次・全履歴の累計）。
  * 収支推移・予実差とは別枠のグラフとして扱う。
  */
 export function AssetFormationChart({
   data,
-  granularity,
   isLoading,
 }: {
-  data: AssetFormationPoint[];
-  granularity: TrendGranularity;
+  data: CumulativeAssetPoint[];
   isLoading?: boolean;
 }) {
   if (isLoading) {
@@ -100,7 +95,7 @@ export function AssetFormationChart({
             tick={{ fill: 'var(--chart-muted)', fontSize: 12 }}
             tickLine={false}
             axisLine={{ stroke: 'var(--chart-axis)' }}
-            tickFormatter={(period: string) => formatPeriodTick(period, granularity)}
+            tickFormatter={(period: string) => formatYearMonth(period)}
           />
           <YAxis
             stroke="var(--chart-axis)"
@@ -108,16 +103,13 @@ export function AssetFormationChart({
             tickLine={false}
             axisLine={false}
             width={56}
-            tickFormatter={(v: number) => `${Math.round(v / 1000)}k`}
+            tickFormatter={formatManYenTick}
           />
-          <Tooltip
-            content={<CustomTooltip granularity={granularity} />}
-            cursor={{ stroke: 'var(--chart-axis)' }}
-          />
+          <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--chart-axis)' }} />
           <Area
             type="monotone"
             dataKey="amount"
-            name="積立・投資等"
+            name="積立・投資等（累計）"
             stroke="var(--series-transfer)"
             strokeWidth={2}
             fill="url(#assetFormationFill)"

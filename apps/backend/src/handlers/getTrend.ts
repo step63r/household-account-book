@@ -8,8 +8,8 @@ import { getTrend } from '../services/aggregationService';
 const transactionRepository = new DynamoTransactionRepository();
 
 /**
- * GET /aggregation/trend?granularity=day|week|month&from=YYYY-MM-DD&to=YYYY-MM-DD
- * transfer を除外した収支推移。日/週/月粒度でLambda側インメモリ集計する。
+ * GET /aggregation/trend?granularity=day|week|month|year&from=YYYY-MM-DD&to=YYYY-MM-DD
+ * transfer を除外した収支推移。日/週/月/年粒度でLambda側インメモリ集計する。from省略時は全履歴が対象。
  */
 export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
   try {

@@ -13,7 +13,7 @@
 ### フロントエンド
 - React + TypeScript + Vite（SPA）
 - UI: Tailwind CSS + shadcn/ui
-- グラフ: Recharts（日/週/月推移、費目別ピボット、予実差）
+- グラフ: Recharts（日/週/月/年推移、費目別ピボット、予実差、資産形成推移の累計）
 - データフェッチ: TanStack Query
 - フォーム: React Hook Form + Zod
 - ホスティング: AWS Amplify Hosting。カスタムドメイン `https://household.minatoproject.com`（SES送信ドメイン`minatoproject.com`のサブドメイン）を使用。ただしこのカスタムドメイン紐付け（Route 53 / ACM証明書 / Amplifyドメイン設定）は本リポジトリのCDK（`infra/lib/hosting-stack.ts`）では一切管理しておらず、リポジトリ外（Amplifyコンソール等）で設定済みのものを前提としている点に注意
@@ -71,6 +71,7 @@ pnpmワークスペース（`pnpm-workspace.yaml`）。ルート`package.json`�
 - `pnpm -r typecheck` / `pnpm -r lint` / `pnpm -r test` / `pnpm -r build` — 各ワークスペース横断で実行
 - `pnpm --filter @household/frontend dev` — フロントエンド開発サーバー起動（Vite）
 - `pnpm --filter @household/backend test` — バックエンドのユニットテスト（vitest、AWSには接続しない）
+- `pnpm --filter @household/frontend test` — フロントエンドのユニットテスト（vitest、DOM無し。`src/lib`配下の純粋関数のみが対象。2026-07-30時点でコンポーネントのレンダリングテストは未導入）
 - `cd infra && pnpm exec cdk synth` / `cdk diff` — CDKの構文検証・差分確認（副作用なし、ローカルで安全に実行可）
 - `cdk deploy` は実AWSへの課金・破壊的操作を伴うため、`infra-cdk`エージェント/CLAUDE.mdの方針どおり、実行前に必ずユーザーへ確認すること。`infra/cdk.json`の`stage`コンテキストは`"prod"`固定（個人利用でdev環境を廃止したため。過去に存在した`Household-dev-*`一式は2026-07-24に完全削除済み）。このAWSアカウントには本プロジェクト以外のCDK/SAMスタックも存在するため、`CDKToolkit`ブートストラップスタックなどアカウント共有リソースに触れる操作は特に慎重に
 
@@ -81,7 +82,11 @@ pnpmワークスペース（`pnpm-workspace.yaml`）。ルート`package.json`�
   - パスワードリセット（`apps/backend/src/handlers/customMessage.ts`）実装済み。Cognitoの`CustomMessage`トリガーとして、`triggerSource === 'CustomMessage_ForgotPassword'`のときのみメール本文を差し替え、確認コードを`${FRONTEND_BASE_URL}/reset-password?email=...&code=...`のリンクに埋め込む。他のtriggerSource（サインアップ確認等）はデフォルトテンプレートのまま。他の認証系機能と同様バックエンドAPIは経由せず、フロントは`ConfirmForgotPassword`をCognitoに直接呼ぶ
 - フロントエンド:
   - 費目・取引・予算・退会はすべて実バックエンドAPIに配線済み（`src/lib/categories.ts` / `transactions.ts` / `budgets.ts` / `account.ts`、いずれも`apiFetch`経由）。localStorageモック（`local-store.ts`）は削除済み
-  - ダッシュボードの集計（収支推移・資産形成推移・予実差）は`src/lib/aggregate.ts`によるクライアント側計算のまま。バックエンドの`/aggregation/*`エンドポイントは実装済みだがフロントからはまだ未使用（既知の積み残し。切り替える場合は取引・予算の全件取得をやめてこのエンドポイントを叩く形に変更する）
+  - ダッシュボードの集計（収支推移・費目別内訳・資産形成推移・予実差）は2026-07-30にバックエンドの`/aggregation/*`エンドポイント（`getTrend`/`getCategoryPivot`/`getBudgetVariance`）経由に切替済み（旧`src/lib/aggregate.ts`によるクライアント側全件集計は削除済み）。取引・予算の全件取得はやめ、`src/lib/aggregation.ts`から用途ごとに期間を絞った5クエリ（収支推移用・KPIタイル用・費目別ピボット用・予実差用・資産形成推移用）を投げる構成にした
+    - 収支推移の日次/週次は当月のみ、新規追加した年次（`TrendGranularity`に`'year'`を追加）は当年のみを対象期間とする。月次は従来通り無期限（`getTrend`の`from`はoptional化済み）
+    - 資産形成推移は収支推移の期間トグルから独立し、常に「全期間・月次・累計」を表示（`TrendPoint.transfer`を月次集計→フロントで単純なランニングサム）。期間トグルUIは持たない
+    - ダッシュボード上部に当月サマリーKPIタイル（収入・支出・差引残高・貯蓄率、前月比バッジ、`SummaryStatTiles.tsx`）と費目別支出の内訳（`CategoryBreakdownChart.tsx`、上位6費目＋その他の横棒メーターリスト）を追加
+    - グラフのY軸は「1k」等ではなく「◯万」表記（`src/lib/format.ts`の`formatManYenTick`）に統一。ツールチップ等の金額表示も`formatYen`に集約
   - 認証: `amazon-cognito-identity-js`でCognito User Poolに直接連携（サインアップ→確認コード→ログイン→ログアウト）を実装済み（`src/lib/auth.ts`）。バックエンドを経由しない設計（`/auth/*`エンドポイントは存在しない、CLAUDE.mdの方針どおり）。退会だけは例外的にバックエンドAPI（`POST /users/me/withdraw`）を叩く（`src/lib/account.ts`。`auth.ts`に置くと`api.ts`との循環importになるため分離）
   - 設定画面でのメールアドレス変更も実装済み（`SettingsPage.tsx`、`src/lib/auth.ts`の`requestEmailChange`/`confirmEmailChange`）。認証と同様バックエンドを経由せずCognitoに直接連携し、User Poolの`keepOriginal.email`設定（`infra/lib/auth-stack.ts`）により新アドレス宛の確認コード検証が完了するまで実際のメール属性は変わらない。バックエンドのDynamoDBはメールアドレスをキャッシュしていない（退会時にJWTクレームから都度読むのみ）ため、この変更に追随するバックエンド側の対応は不要
   - パスワードリセット実装済み（`src/pages/ResetPasswordPage.tsx`、`src/lib/auth.ts`の`forgotPassword`/`confirmForgotPassword`）。ログイン画面から遷移し、URLに`email`/`code`クエリパラメータが無ければメールアドレス入力フォーム（Cognito`ForgotPassword`を呼びメール送信）、両方あれば新パスワード入力フォーム（Cognito`ConfirmForgotPassword`を呼ぶ）を出し分ける。リンクの有効期限はCognito標準の固定値に依存しており、本プロジェクト側で短縮する仕組みは持たない（UI文言でも具体的な分数は明記していない）

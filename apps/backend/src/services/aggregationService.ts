@@ -15,7 +15,7 @@ const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD')
 
 const trendQuerySchema = z.object({
   granularity: trendGranularitySchema,
-  from: dateSchema,
+  from: dateSchema.optional(),
   to: dateSchema,
 });
 
@@ -51,10 +51,15 @@ function isoWeekPeriod(date: string): string {
 function periodOf(date: string, granularity: TrendGranularity): string {
   if (granularity === 'day') return date;
   if (granularity === 'month') return date.slice(0, 7);
+  if (granularity === 'year') return date.slice(0, 4);
   return isoWeekPeriod(date);
 }
 
-/** transferを除外した収支推移。日/週/月粒度で集計する（CLAUDE.mdのtransfer除外ルール）。 */
+/**
+ * 収支（income/expense）推移。日/週/月/年粒度で集計する（CLAUDE.mdのtransfer除外ルール）。
+ * transferはincome/expenseの集計からは除外しつつ、フロントの資産形成推移（累計）チャートで
+ * 再利用できるよう期間ごとの合計を並行して`transfer`フィールドに持たせる。
+ */
 export async function getTrend(
   transactionRepository: TransactionRepository,
   userId: string,
@@ -63,22 +68,23 @@ export async function getTrend(
   const { granularity, from, to } = trendQuerySchema.parse(rawQuery);
   const transactions = await transactionRepository.listByUser(userId, { from, to });
 
-  const buckets = new Map<string, { income: number; expense: number }>();
+  const buckets = new Map<string, { income: number; expense: number; transfer: number }>();
   for (const transaction of transactions) {
-    if (transaction.type === 'transfer') continue;
     const period = periodOf(transaction.date, granularity);
-    const bucket = buckets.get(period) ?? { income: 0, expense: 0 };
+    const bucket = buckets.get(period) ?? { income: 0, expense: 0, transfer: 0 };
     if (transaction.type === 'income') {
       bucket.income += transaction.amount;
-    } else {
+    } else if (transaction.type === 'expense') {
       bucket.expense += transaction.amount;
+    } else {
+      bucket.transfer += transaction.amount;
     }
     buckets.set(period, bucket);
   }
 
   return [...buckets.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([period, { income, expense }]) => ({ period, income, expense }));
+    .map(([period, { income, expense, transfer }]) => ({ period, income, expense, transfer }));
 }
 
 /** 費目別ピボット（expenseのみ、transferだけでなくincomeも除外 - 費目集計の対象は支出）。 */
@@ -141,6 +147,10 @@ export async function getBudgetVariance(
 
   const categoryIds = new Set([...budgets.map((b) => b.categoryId), ...actualByCategory.keys()]);
 
+  // Matches the frontend's (now superseded) client-side computeBudgetVariance ordering:
+  // fixed categories before variable, then by sortOrder, with missing categories (未分類) last.
+  const categoryTypeOrder: Record<'fixed' | 'variable', number> = { fixed: 0, variable: 1 };
+
   return [...categoryIds]
     .map((categoryId) => {
       const category = categoryById.get(categoryId);
@@ -153,7 +163,16 @@ export async function getBudgetVariance(
         actualAmount,
         varianceAmount: actualAmount - budgetAmount,
       };
-      return row;
+      return { row, category };
     })
-    .sort((a, b) => a.categoryName.localeCompare(b.categoryName, 'ja'));
+    .sort((a, b) => {
+      const typeOrderA = a.category ? categoryTypeOrder[a.category.type] : 2;
+      const typeOrderB = b.category ? categoryTypeOrder[b.category.type] : 2;
+      if (typeOrderA !== typeOrderB) return typeOrderA - typeOrderB;
+      const sortOrderA = a.category?.sortOrder ?? Infinity;
+      const sortOrderB = b.category?.sortOrder ?? Infinity;
+      if (sortOrderA !== sortOrderB) return sortOrderA - sortOrderB;
+      return a.row.categoryName.localeCompare(b.row.categoryName, 'ja');
+    })
+    .map(({ row }) => row);
 }

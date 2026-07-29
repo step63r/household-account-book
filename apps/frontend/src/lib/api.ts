@@ -2,9 +2,8 @@
  * 型付き API クライアント。
  *
  * ベース URL の解決・認証トークンの付与・エラー正規化を担う薄い fetch ラッパー。
- * 各リソースは `src/lib/categories.ts` / `transactions.ts` / `budgets.ts` / `account.ts`
- * がこの `apiFetch` を使って apps/backend を呼び出す（集計エンドポイントはまだフロントから
- * 呼んでいない — `DashboardPage.tsx` は引き続き `src/lib/aggregate.ts` でクライアント側集計）。
+ * 各リソースは `src/lib/categories.ts` / `transactions.ts` / `budgets.ts` / `account.ts` /
+ * `aggregation.ts` がこの `apiFetch` を使って apps/backend を呼び出す。
  *
  * エンドポイント形状（apps/backend の実装・infra の CDK ルーティングと確認済み、すべて実装済み）:
  *   GET    /categories                                    src/lib/categories.ts
@@ -17,9 +16,9 @@
  *   DELETE /transactions/:id
  *   GET    /budgets?yearMonth=YYYY-MM                      src/lib/budgets.ts
  *   PUT    /budgets  (upsert, body: UpsertBudgetInput)
- *   GET    /aggregation/trend?granularity=day|week|month&from=...&to=...   (未使用)
- *   GET    /aggregation/category-pivot?from=...&to=...                     (未使用)
- *   GET    /aggregation/budget-variance?yearMonth=YYYY-MM                  (未使用)
+ *   GET    /aggregation/trend?granularity=day|week|month|year&from=...&to=...   src/lib/aggregation.ts
+ *   GET    /aggregation/category-pivot?from=...&to=...&granularity=...
+ *   GET    /aggregation/budget-variance?yearMonth=YYYY-MM
  *   POST   /users/me/withdraw                               src/lib/account.ts
  *   GET    /users/me/consent                                src/lib/consent.ts
  *   POST   /users/me/consent

@@ -10,15 +10,10 @@ import {
 } from 'recharts';
 import type { TrendGranularity, TrendPoint } from '@household/shared';
 import { formatPeriodLabel, formatPeriodTick } from '@/lib/date';
+import { formatManYenTick, formatYen } from '@/lib/format';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const BAR_SKELETON_HEIGHTS = [55, 80, 40, 95, 60, 75, 45];
-
-const yenFormatter = new Intl.NumberFormat('ja-JP', {
-  style: 'currency',
-  currency: 'JPY',
-  maximumFractionDigits: 0,
-});
 
 function CustomTooltip({
   active,
@@ -44,7 +39,7 @@ function CustomTooltip({
           />
           <span className="text-muted-foreground">{entry.name}</span>
           <span className="ml-auto font-medium tabular-nums">
-            {yenFormatter.format(entry.value)}
+            {formatYen(entry.value)}
           </span>
         </p>
       ))}
@@ -107,7 +102,7 @@ export function TrendChart({
             tickLine={false}
             axisLine={false}
             width={56}
-            tickFormatter={(v: number) => `${Math.round(v / 1000)}k`}
+            tickFormatter={formatManYenTick}
           />
           <Tooltip
             content={<CustomTooltip granularity={granularity} />}

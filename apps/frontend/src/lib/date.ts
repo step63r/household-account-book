@@ -36,13 +36,47 @@ function formatUtcDateShort(date: Date): string {
 export function formatPeriodLabel(period: string, granularity: TrendGranularity): string {
   if (granularity === 'day') return formatDate(period);
   if (granularity === 'month') return formatYearMonth(period);
+  if (granularity === 'year') return `${period}年`;
   return formatUtcDateFull(isoWeekStartDate(period));
 }
 
-/** グラフのX軸目盛りで使う、期間の短縮表示ラベル。日・週は m/d、月は yyyy/MM。 */
+/** グラフのX軸目盛りで使う、期間の短縮表示ラベル。日・週は m/d、月は yyyy/MM、年はそのまま。 */
 export function formatPeriodTick(period: string, granularity: TrendGranularity): string {
   if (granularity === 'month') return formatYearMonth(period);
   if (granularity === 'week') return formatUtcDateShort(isoWeekStartDate(period));
+  if (granularity === 'year') return period;
   const [, m, d] = period.split('-');
   return `${Number(m)}/${Number(d)}`;
+}
+
+/** 日本時間の本日日付（YYYY-MM-DD）。toISOString()はUTC基準になるため使わない
+ * （深夜0〜9時のUTC日付が前日にずれる）。 */
+export function todayJst(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date());
+}
+
+/** 日本時間の当月（YYYY-MM）。 */
+export function currentYearMonthJst(): string {
+  return todayJst().slice(0, 7);
+}
+
+/** 日本時間の当年（YYYY）。 */
+export function currentYearJst(): string {
+  return todayJst().slice(0, 4);
+}
+
+/** 指定した年月（YYYY-MM）の前月（YYYY-MM）を返す。1月なら前年12月にロールオーバーする。 */
+export function previousYearMonth(yearMonth: string): string {
+  const [yearStr, monthStr] = yearMonth.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  if (month === 1) return `${year - 1}-12`;
+  return `${year}-${String(month - 1).padStart(2, '0')}`;
+}
+
+/** 指定した年月（YYYY-MM）の初日・末日（YYYY-MM-DD）を返す。集計APIの範囲指定に使う。 */
+export function monthDateRange(yearMonth: string): { from: string; to: string } {
+  const [yearStr, monthStr] = yearMonth.split('-');
+  const lastDay = new Date(Number(yearStr), Number(monthStr), 0).getDate();
+  return { from: `${yearMonth}-01`, to: `${yearMonth}-${String(lastDay).padStart(2, '0')}` };
 }
