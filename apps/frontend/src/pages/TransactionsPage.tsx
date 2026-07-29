@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { MultiSelectFilter } from '@/components/ui/multi-select-filter';
 import { getCategories } from '@/lib/categories';
 import {
   createTransaction,
@@ -129,19 +130,49 @@ function buildTransactionInput(values: CreateTransactionInput): CreateTransactio
   };
 }
 
+/** 種別フィルタの選択肢（順序固定）。 */
+const TYPE_FILTER_OPTIONS: TransactionType[] = ['income', 'expense', 'transfer'];
+
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
 
-  const [yearMonth, setYearMonth] = useState(currentYearMonth());
-  const { from, to } = monthDateRange(yearMonth);
+  const defaultRange = monthDateRange(currentYearMonth());
+  const [dateFrom, setDateFrom] = useState(defaultRange.from);
+  const [dateTo, setDateTo] = useState(defaultRange.to);
+  const [selectedTypes, setSelectedTypes] = useState<TransactionType[]>([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [amountMin, setAmountMin] = useState(NaN);
+  const [amountMax, setAmountMax] = useState(NaN);
+  const [memoQuery, setMemoQuery] = useState('');
+
   const transactionsQuery = useQuery({
-    queryKey: ['transactions', yearMonth],
-    queryFn: async () => getTransactions({ from, to }),
+    queryKey: ['transactions', dateFrom, dateTo],
+    queryFn: async () => getTransactions({ from: dateFrom || undefined, to: dateTo || undefined }),
   });
   const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: async () => getCategories() });
   const transactions = transactionsQuery.data ?? EMPTY_ARRAY;
   const categories = categoriesQuery.data ?? EMPTY_ARRAY;
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+
+  /** 費目フィルタの選択肢。費目マスタ全件ではなく、今フェッチしている取引に実際に登場する費目のみ */
+  const displayedCategoryOptions = useMemo(() => {
+    const ids = new Set(
+      transactions.filter((tx) => tx.type === 'expense' && tx.categoryId).map((tx) => tx.categoryId as string),
+    );
+    return categories
+      .filter((c) => ids.has(c.id))
+      .map((c) => ({ value: c.id, label: c.name }));
+  }, [transactions, categories]);
+
+  function clearFilters() {
+    setDateFrom(defaultRange.from);
+    setDateTo(defaultRange.to);
+    setSelectedTypes([]);
+    setSelectedCategoryIds([]);
+    setAmountMin(NaN);
+    setAmountMax(NaN);
+    setMemoQuery('');
+  }
 
   const [dialogState, setDialogState] = useState<{ open: boolean; transaction: Transaction | null }>({
     open: false,
@@ -178,7 +209,24 @@ export default function TransactionsPage() {
     setDialogState({ open: true, transaction });
   }
 
-  const sortedTransactions = [...transactions].sort(
+  const filteredTransactions = useMemo(() => {
+    const trimmedMemoQuery = memoQuery.trim();
+    return transactions.filter((tx) => {
+      if (selectedTypes.length > 0 && !selectedTypes.includes(tx.type)) return false;
+      if (
+        selectedCategoryIds.length > 0 &&
+        (!tx.categoryId || !selectedCategoryIds.includes(tx.categoryId))
+      ) {
+        return false;
+      }
+      if (!Number.isNaN(amountMin) && tx.amount < amountMin) return false;
+      if (!Number.isNaN(amountMax) && tx.amount > amountMax) return false;
+      if (trimmedMemoQuery !== '' && !(tx.memo ?? '').includes(trimmedMemoQuery)) return false;
+      return true;
+    });
+  }, [transactions, selectedTypes, selectedCategoryIds, amountMin, amountMax, memoQuery]);
+
+  const sortedTransactions = [...filteredTransactions].sort(
     (a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt),
   );
 
@@ -211,16 +259,61 @@ export default function TransactionsPage() {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+        <CardHeader>
           <CardTitle>取引一覧</CardTitle>
-          <Input
-            type="month"
-            value={yearMonth}
-            onChange={(e) => setYearMonth(e.target.value)}
-            className="w-40"
-          />
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="w-36"
+              />
+              <span className="text-muted-foreground text-sm">〜</span>
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="w-36"
+              />
+            </div>
+
+            <MultiSelectFilter
+              label="種別"
+              options={TYPE_FILTER_OPTIONS.map((type) => ({ value: type, label: TYPE_LABEL[type] }))}
+              selected={selectedTypes}
+              onChange={(values) => setSelectedTypes(values as TransactionType[])}
+            />
+
+            <MultiSelectFilter
+              label="費目"
+              options={displayedCategoryOptions}
+              selected={selectedCategoryIds}
+              onChange={setSelectedCategoryIds}
+            />
+
+            <div className="flex items-center gap-2">
+              <AmountInput value={amountMin} onChange={setAmountMin} placeholder="下限" className="w-24" />
+              <span className="text-muted-foreground text-sm">円〜</span>
+              <AmountInput value={amountMax} onChange={setAmountMax} placeholder="上限" className="w-24" />
+              <span className="text-muted-foreground text-sm">円</span>
+            </div>
+
+            <Input
+              type="text"
+              value={memoQuery}
+              onChange={(e) => setMemoQuery(e.target.value)}
+              placeholder="摘要で検索"
+              className="w-40"
+            />
+
+            <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+              フィルタを解除
+            </Button>
+          </div>
+
           {transactionsQuery.isPending ? (
             <TransactionsTableSkeleton />
           ) : sortedTransactions.length === 0 ? (
