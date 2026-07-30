@@ -4,6 +4,8 @@ import type { BudgetVarianceRow, CategoryPivotRow, TrendGranularity, TrendPoint 
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { TrendChart } from '@/components/charts/TrendChart';
 import { AssetFormationChart } from '@/components/charts/AssetFormationChart';
 import { BudgetVarianceList } from '@/components/charts/BudgetVarianceList';
@@ -12,12 +14,12 @@ import { SummaryStatTiles } from '@/components/charts/SummaryStatTiles';
 import { getBudgetVariance, getCategoryPivot, getTrend } from '@/lib/aggregation';
 import { toCumulativeSeries } from '@/lib/assetFormation';
 import {
-  currentYearJst,
   currentYearMonthJst,
   formatYearMonth,
   monthDateRange,
   previousYearMonth,
   todayJst,
+  yearDateRange,
 } from '@/lib/date';
 import { EMPTY_ARRAY } from '@/lib/utils';
 
@@ -34,33 +36,34 @@ const EMPTY_TREND_POINTS: TrendPoint[] = [];
 const EMPTY_BUDGET_VARIANCE_ROWS: BudgetVarianceRow[] = [];
 const EMPTY_CATEGORY_PIVOT_ROWS: CategoryPivotRow[] = [];
 
-/** 収支推移グラフの粒度に応じた取得範囲。日/週は当月、年は当年、月は全履歴。 */
-function trendRangeFor(granularity: TrendGranularity): { from?: string; to: string } {
-  const to = todayJst();
+/** 収支推移グラフの粒度に応じた取得範囲。日/週は選択月、月は選択年、年は選択に関わらず全履歴。 */
+function trendRangeFor(granularity: TrendGranularity, selectedYearMonth: string): { from?: string; to: string } {
   if (granularity === 'year') {
-    return { from: `${currentYearJst()}-01-01`, to };
+    return { to: todayJst() };
   }
   if (granularity === 'month') {
-    return { to };
+    return yearDateRange(selectedYearMonth.slice(0, 4));
   }
-  return { from: `${currentYearMonthJst()}-01`, to };
+  return monthDateRange(selectedYearMonth);
 }
 
 export default function DashboardPage() {
   const [granularity, setGranularity] = useState<TrendGranularity>('day');
-  const yearMonth = currentYearMonthJst();
+  const [selectedYearMonth, setSelectedYearMonth] = useState(currentYearMonthJst());
+  const yearMonth = selectedYearMonth;
   const previousMonth = previousYearMonth(yearMonth);
-  const today = todayJst();
+  const currentMonth = currentYearMonthJst();
 
-  const trendRange = trendRangeFor(granularity);
+  const trendRange = trendRangeFor(granularity, selectedYearMonth);
   const trendQuery = useQuery({
     queryKey: ['aggregation', 'trend', granularity, trendRange.from ?? null, trendRange.to],
     queryFn: async () => getTrend({ granularity, ...trendRange }),
   });
 
+  const kpiRangeTo = monthDateRange(yearMonth).to;
   const kpiTrendQuery = useQuery({
-    queryKey: ['aggregation', 'trend', 'month', previousMonth, today],
-    queryFn: async () => getTrend({ granularity: 'month', from: `${previousMonth}-01`, to: today }),
+    queryKey: ['aggregation', 'trend', 'month', previousMonth, kpiRangeTo],
+    queryFn: async () => getTrend({ granularity: 'month', from: `${previousMonth}-01`, to: kpiRangeTo }),
   });
 
   const categoryPivotQuery = useQuery({
@@ -74,8 +77,8 @@ export default function DashboardPage() {
   });
 
   const assetFormationQuery = useQuery({
-    queryKey: ['aggregation', 'trend', 'month', 'all-history', today],
-    queryFn: async () => getTrend({ granularity: 'month', to: today }),
+    queryKey: ['aggregation', 'trend', 'month', 'all-history'],
+    queryFn: async () => getTrend({ granularity: 'month', to: todayJst() }),
   });
 
   const isInitialLoading =
@@ -95,9 +98,26 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold">ダッシュボード</h1>
-        <p className="text-sm text-muted-foreground">収支の推移と予算の状況を確認できます</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">ダッシュボード</h1>
+          <p className="text-sm text-muted-foreground">収支の推移と予算の状況を確認できます</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Input
+            type="month"
+            value={selectedYearMonth}
+            max={currentMonth}
+            onChange={(e) => setSelectedYearMonth(e.target.value)}
+            className="w-40"
+            aria-label="表示する年月"
+          />
+          {selectedYearMonth !== currentMonth && (
+            <Button variant="outline" size="sm" onClick={() => setSelectedYearMonth(currentMonth)}>
+              今月に戻す
+            </Button>
+          )}
+        </div>
       </div>
 
       <SummaryStatTiles
@@ -138,12 +158,13 @@ export default function DashboardPage() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle>予実差（当月・費目別）</CardTitle>
+            <CardTitle>予実差（費目別）</CardTitle>
             <CardDescription>{formatYearMonth(yearMonth)} の予算に対する実績</CardDescription>
           </CardHeader>
           <CardContent>
             <BudgetVarianceList
               rows={budgetVarianceQuery.data ?? EMPTY_BUDGET_VARIANCE_ROWS}
+              yearMonth={yearMonth}
               isLoading={isInitialLoading}
             />
           </CardContent>

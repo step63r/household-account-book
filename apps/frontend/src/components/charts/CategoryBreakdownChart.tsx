@@ -1,5 +1,6 @@
 import type { CategoryPivotRow } from '@household/shared';
 import { formatYen } from '@/lib/format';
+import { formatYearMonth } from '@/lib/date';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const TOP_N = 6;
@@ -70,7 +71,7 @@ export function CategoryBreakdownChart({
   if (breakdownRows.length === 0 || total === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        当月の支出データがありません
+        {formatYearMonth(yearMonth)}の支出データがありません
       </div>
     );
   }

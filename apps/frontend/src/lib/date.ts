@@ -80,3 +80,8 @@ export function monthDateRange(yearMonth: string): { from: string; to: string } 
   const lastDay = new Date(Number(yearStr), Number(monthStr), 0).getDate();
   return { from: `${yearMonth}-01`, to: `${yearMonth}-${String(lastDay).padStart(2, '0')}` };
 }
+
+/** 指定した年（YYYY）の1/1・12/31（YYYY-MM-DD）を返す。集計APIの範囲指定に使う。 */
+export function yearDateRange(year: string): { from: string; to: string } {
+  return { from: `${year}-01-01`, to: `${year}-12-31` };
+}

@@ -1,14 +1,17 @@
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import type { BudgetVarianceRow } from '@household/shared';
 import { formatYen } from '@/lib/format';
+import { formatYearMonth } from '@/lib/date';
 import { Skeleton } from '@/components/ui/skeleton';
 
-/** 予実差の表示エリア（費目別、当月）。バー(メーター)+ステータス色で over/under を示す。 */
+/** 予実差の表示エリア（費目別、指定月）。バー(メーター)+ステータス色で over/under を示す。 */
 export function BudgetVarianceList({
   rows,
+  yearMonth,
   isLoading,
 }: {
   rows: BudgetVarianceRow[];
+  yearMonth: string;
   isLoading?: boolean;
 }) {
   if (isLoading) {
@@ -31,7 +34,7 @@ export function BudgetVarianceList({
   if (rows.length === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        当月の予算・実績データがありません
+        {formatYearMonth(yearMonth)}の予算・実績データがありません
       </div>
     );
   }
