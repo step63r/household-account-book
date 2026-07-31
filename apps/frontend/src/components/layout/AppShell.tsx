@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { Wallet } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { Footer } from './Footer';
 import { NAV_ITEMS } from './nav-items';
 
 export function AppShell() {
@@ -43,6 +44,7 @@ export function AppShell() {
       <main className="flex-1 overflow-x-hidden px-4 py-6 pb-24 md:px-8 md:py-8 md:pb-8">
         <div className="mx-auto w-full max-w-5xl">
           <Outlet />
+          <Footer />
         </div>
       </main>
 

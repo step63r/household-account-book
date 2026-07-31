@@ -11,6 +11,7 @@ import LoginPage from '@/pages/LoginPage';
 import SignupPage from '@/pages/SignupPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import ConsentPage from '@/pages/ConsentPage';
+import TermsOfServicePage from '@/pages/TermsOfServicePage';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/terms" element={<TermsOfServicePage />} />
 
       <Route element={<RequireAuth />}>
         <Route path="/consent" element={<ConsentPage />} />
