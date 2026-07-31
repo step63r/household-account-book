@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -23,6 +23,7 @@ import { getCategories } from '@/lib/categories';
 import { getBudgets, upsertBudget } from '@/lib/budgets';
 import { EMPTY_ARRAY } from '@/lib/utils';
 import { formatYearMonth } from '@/lib/date';
+import { formatYen } from '@/lib/format';
 
 /** 日本時間の当月（YYYY-MM）。toISOString()はUTC基準になるため使わない
  * （月初〜朝9時のUTC日付が前月にずれる）。 */
@@ -101,6 +102,14 @@ export default function BudgetsPage() {
   const fixedCategories = categories.filter((c) => c.type === 'fixed');
   const variableCategories = categories.filter((c) => c.type === 'variable');
 
+  // 保存前の入力値（未保存分も含む）から各合計を算出する
+  const watchedAmounts = useWatch({ control: form.control });
+  const sumAmounts = (categoryList: { id: string }[]) =>
+    categoryList.reduce((sum, c) => sum + (Number(watchedAmounts?.[c.id]) || 0), 0);
+  const totalAmount = sumAmounts(categories);
+  const fixedTotalAmount = sumAmounts(fixedCategories);
+  const variableTotalAmount = sumAmounts(variableCategories);
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -113,21 +122,13 @@ export default function BudgetsPage() {
           <CardTitle>対象月</CardTitle>
         </CardHeader>
         <CardContent>
-          <Input
-            type="month"
-            value={yearMonth}
-            onChange={(e) => setYearMonth(e.target.value)}
-            className="w-48"
-          />
-        </CardContent>
-      </Card>
-
-      <Form {...form}>
-        <form onSubmit={onSubmit} className="flex flex-col gap-6">
-          <BudgetCategoryGroup title="固定費" categories={fixedCategories} control={form.control} />
-          <BudgetCategoryGroup title="変動費" categories={variableCategories} control={form.control} />
-
-          <div className="flex justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <Input
+              type="month"
+              value={yearMonth}
+              onChange={(e) => setYearMonth(e.target.value)}
+              className="w-48"
+            />
             <Dialog open={copyDialogOpen} onOpenChange={setCopyDialogOpen}>
               <DialogTrigger asChild>
                 <Button
@@ -161,7 +162,23 @@ export default function BudgetsPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+          </div>
+        </CardContent>
+      </Card>
 
+      <BudgetTotalRow label="予算の合計" amount={totalAmount} />
+
+      <Form {...form}>
+        <form onSubmit={onSubmit} className="flex flex-col gap-6">
+          <BudgetCategoryGroup title="固定費" categories={fixedCategories} control={form.control} />
+
+          <BudgetTotalRow label="固定費の合計" amount={fixedTotalAmount} />
+
+          <BudgetCategoryGroup title="変動費" categories={variableCategories} control={form.control} />
+
+          <BudgetTotalRow label="変動費の合計" amount={variableTotalAmount} />
+
+          <div className="flex justify-end">
             <Button
               type="submit"
               disabled={saveMutation.isPending || categories.length === 0}
@@ -172,6 +189,15 @@ export default function BudgetsPage() {
           </div>
         </form>
       </Form>
+    </div>
+  );
+}
+
+function BudgetTotalRow({ label, amount }: { label: string; amount: number }) {
+  return (
+    <div className="flex items-center justify-between rounded-md border bg-muted/40 px-4 py-2 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-semibold">{formatYen(amount)}</span>
     </div>
   );
 }
