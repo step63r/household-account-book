@@ -51,7 +51,7 @@ import {
   updateTransaction,
 } from '@/lib/transactions';
 import { EMPTY_ARRAY } from '@/lib/utils';
-import { formatDate } from '@/lib/date';
+import { addMonthsToDate, formatDate } from '@/lib/date';
 
 const TYPE_LABEL: Record<TransactionType, string> = {
   income: '収入',
@@ -133,6 +133,9 @@ function buildTransactionInput(values: CreateTransactionInput): CreateTransactio
 /** 種別フィルタの選択肢（順序固定）。 */
 const TYPE_FILTER_OPTIONS: TransactionType[] = ['income', 'expense', 'transfer'];
 
+/** 取引一覧の範囲指定で許容する最大期間（月数）。 */
+const MAX_DATE_RANGE_MONTHS = 3;
+
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
 
@@ -163,6 +166,34 @@ export default function TransactionsPage() {
       .filter((c) => ids.has(c.id))
       .map((c) => ({ value: c.id, label: c.name }));
   }, [transactions, categories]);
+
+  /** FROMを変更。TOがFROMより前になる場合はTOをFROMに合わせ、範囲が最大期間を超える場合はTOを詰める。 */
+  function handleDateFromChange(value: string) {
+    setDateFrom(value);
+    if (!value) return;
+    if (dateTo && dateTo < value) {
+      setDateTo(value);
+      return;
+    }
+    const maxTo = addMonthsToDate(value, MAX_DATE_RANGE_MONTHS);
+    if (dateTo && dateTo > maxTo) {
+      setDateTo(maxTo);
+    }
+  }
+
+  /** TOを変更。FROMがTOより後になる場合はFROMをTOに合わせ、範囲が最大期間を超える場合はFROMを詰める。 */
+  function handleDateToChange(value: string) {
+    setDateTo(value);
+    if (!value) return;
+    if (dateFrom && dateFrom > value) {
+      setDateFrom(value);
+      return;
+    }
+    const minFrom = addMonthsToDate(value, -MAX_DATE_RANGE_MONTHS);
+    if (dateFrom && dateFrom < minFrom) {
+      setDateFrom(minFrom);
+    }
+  }
 
   function clearFilters() {
     setDateFrom(defaultRange.from);
@@ -268,14 +299,18 @@ export default function TransactionsPage() {
               <Input
                 type="date"
                 value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
+                onChange={(e) => handleDateFromChange(e.target.value)}
+                min={dateTo ? addMonthsToDate(dateTo, -MAX_DATE_RANGE_MONTHS) : undefined}
+                max={dateTo || undefined}
                 className="w-36"
               />
               <span className="text-muted-foreground text-sm">〜</span>
               <Input
                 type="date"
                 value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
+                onChange={(e) => handleDateToChange(e.target.value)}
+                min={dateFrom || undefined}
+                max={dateFrom ? addMonthsToDate(dateFrom, MAX_DATE_RANGE_MONTHS) : undefined}
                 className="w-36"
               />
             </div>

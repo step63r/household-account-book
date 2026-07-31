@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatPeriodLabel, formatPeriodTick, monthDateRange, previousYearMonth } from './date';
+import { addMonthsToDate, formatPeriodLabel, formatPeriodTick, monthDateRange, previousYearMonth } from './date';
 
 describe('previousYearMonth', () => {
   it('通常の月は月を1つ戻す', () => {
@@ -38,5 +38,23 @@ describe('monthDateRange', () => {
 
   it('うるう年でない2月は28日までとして返す', () => {
     expect(monthDateRange('2026-02')).toEqual({ from: '2026-02-01', to: '2026-02-28' });
+  });
+});
+
+describe('addMonthsToDate', () => {
+  it('正の月数を加算する', () => {
+    expect(addMonthsToDate('2026-04-15', 3)).toBe('2026-07-15');
+  });
+
+  it('負の月数で減算する', () => {
+    expect(addMonthsToDate('2026-04-15', -3)).toBe('2026-01-15');
+  });
+
+  it('年をまたぐ加算をロールオーバーする', () => {
+    expect(addMonthsToDate('2026-11-01', 3)).toBe('2027-02-01');
+  });
+
+  it('月末日は繰り上がった月の日数に応じて正規化される', () => {
+    expect(addMonthsToDate('2026-01-31', 1)).toBe('2026-03-03');
   });
 });

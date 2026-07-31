@@ -85,3 +85,9 @@ export function monthDateRange(yearMonth: string): { from: string; to: string } 
 export function yearDateRange(year: string): { from: string; to: string } {
   return { from: `${year}-01-01`, to: `${year}-12-31` };
 }
+
+/** ISO日付（yyyy-MM-dd）に指定した月数を加算する（負数で減算）。日付ピッカーの範囲制約計算に使う。 */
+export function addMonthsToDate(dateStr: string, months: number): string {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1 + months, day)).toISOString().slice(0, 10);
+}
