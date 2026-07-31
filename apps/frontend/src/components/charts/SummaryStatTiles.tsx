@@ -45,7 +45,8 @@ function DeltaBadge({ datum }: { datum: StatTileDatum }) {
   if (datum.previousValue === 0) {
     return <span className="text-xs text-muted-foreground">前月データなし</span>;
   }
-  const deltaRatio = (datum.value - datum.previousValue) / datum.previousValue;
+  // 差引残高はマイナスになり得るため、分母は絶対値を使い符号の反転を防ぐ
+  const deltaRatio = (datum.value - datum.previousValue) / Math.abs(datum.previousValue);
   const isGood = datum.goodDirection === 'up' ? deltaRatio >= 0 : deltaRatio <= 0;
   const Icon = deltaRatio >= 0 ? TrendingUp : TrendingDown;
   return (
