@@ -125,6 +125,12 @@ const ROUTES: RouteDef[] = [
     handlerFile: 'getBudgetVariance',
     dynamoActions: ['dynamodb:Query'],
   },
+  {
+    method: apigwv2.HttpMethod.GET,
+    path: '/aggregation/memo-suggestions',
+    handlerFile: 'getMemoSuggestions',
+    dynamoActions: ['dynamodb:Query'],
+  },
   // Account withdrawal (logical delete only - see the module-level note on the physical-deletion batch)
   {
     method: apigwv2.HttpMethod.POST,

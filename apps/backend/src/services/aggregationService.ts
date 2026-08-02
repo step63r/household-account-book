@@ -29,6 +29,13 @@ const budgetVarianceQuerySchema = z.object({
   yearMonth: yearMonthSchema,
 });
 
+const memoSuggestionsQuerySchema = z.object({
+  from: dateSchema.optional(),
+  to: dateSchema.optional(),
+});
+
+const MEMO_SUGGESTIONS_LIMIT = 20;
+
 /** ISO 8601 week ('YYYY-Www'), matching apps/frontend/src/lib/aggregate.ts's client-side
  * implementation so trend/pivot buckets stay identical once the frontend switches to this API. */
 function isoWeekPeriod(date: string): string {
@@ -175,4 +182,35 @@ export async function getBudgetVariance(
       return a.row.categoryName.localeCompare(b.row.categoryName, 'ja');
     })
     .map(({ row }) => row);
+}
+
+/**
+ * 摘要のサジェスト候補。空文字を除いた過去のmemoを重複除去し、直近使用日→使用回数の順で
+ * 上位{@link MEMO_SUGGESTIONS_LIMIT}件を返す。from/to省略時は全履歴が対象。
+ */
+export async function getMemoSuggestions(
+  transactionRepository: TransactionRepository,
+  userId: string,
+  rawQuery: unknown,
+): Promise<string[]> {
+  const { from, to } = memoSuggestionsQuerySchema.parse(rawQuery);
+  const transactions = await transactionRepository.listByUser(userId, { from, to });
+
+  const stats = new Map<string, { count: number; lastUsedAt: string }>();
+  for (const transaction of transactions) {
+    const memo = transaction.memo?.trim();
+    if (!memo) continue;
+    const existing = stats.get(memo);
+    if (existing) {
+      existing.count += 1;
+      if (transaction.date > existing.lastUsedAt) existing.lastUsedAt = transaction.date;
+    } else {
+      stats.set(memo, { count: 1, lastUsedAt: transaction.date });
+    }
+  }
+
+  return [...stats.entries()]
+    .sort(([, a], [, b]) => b.lastUsedAt.localeCompare(a.lastUsedAt) || b.count - a.count)
+    .slice(0, MEMO_SUGGESTIONS_LIMIT)
+    .map(([memo]) => memo);
 }

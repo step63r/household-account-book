@@ -3,6 +3,7 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer } from 'aws-lambda';
 import { handler as getTrendHandler } from './getTrend';
 import { handler as getCategoryPivotHandler } from './getCategoryPivot';
 import { handler as getBudgetVarianceHandler } from './getBudgetVariance';
+import { handler as getMemoSuggestionsHandler } from './getMemoSuggestions';
 
 /**
  * These exercise handler-level concerns (JWT sub extraction, query-param validation,
@@ -114,6 +115,25 @@ describe('getBudgetVariance handler', () => {
     const event = buildAuthenticatedEvent('user-1');
 
     const result = await getBudgetVarianceHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 400 });
+  });
+});
+
+describe('getMemoSuggestions handler', () => {
+  it('returns 401 when the JWT sub claim is missing', async () => {
+    const event = buildEvent();
+
+    const result = await getMemoSuggestionsHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 401 });
+  });
+
+  it('returns 400 when a query param is not a valid date', async () => {
+    const event = buildAuthenticatedEvent('user-1');
+    event.queryStringParameters = { from: 'not-a-date' };
+
+    const result = await getMemoSuggestionsHandler(event, {} as never, () => undefined);
 
     expect(result).toMatchObject({ statusCode: 400 });
   });

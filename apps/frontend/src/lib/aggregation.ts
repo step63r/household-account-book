@@ -38,3 +38,13 @@ export function getCategoryPivot(params: {
 export function getBudgetVariance(yearMonth: string): Promise<BudgetVarianceRow[]> {
   return apiFetch<BudgetVarianceRow[]>(`/aggregation/budget-variance?yearMonth=${encodeURIComponent(yearMonth)}`);
 }
+
+/** GET /aggregation/memo-suggestions?from=YYYY-MM-DD&to=YYYY-MM-DD
+ * 過去の摘要候補（直近使用日→使用回数順、最大20件）。from/to省略時は全履歴が対象。 */
+export function getMemoSuggestions(params: { from?: string; to?: string } = {}): Promise<string[]> {
+  const query = new URLSearchParams();
+  if (params.from) query.set('from', params.from);
+  if (params.to) query.set('to', params.to);
+  const qs = query.toString();
+  return apiFetch<string[]>(`/aggregation/memo-suggestions${qs ? `?${qs}` : ''}`);
+}

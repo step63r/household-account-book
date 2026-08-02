@@ -18,7 +18,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { AmountInput } from '@/components/ui/amount-input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -50,8 +49,9 @@ import {
   getTransactions,
   updateTransaction,
 } from '@/lib/transactions';
+import { getMemoSuggestions } from '@/lib/aggregation';
 import { EMPTY_ARRAY } from '@/lib/utils';
-import { addMonthsToDate, formatDate } from '@/lib/date';
+import { addMonthsToDate, formatDate, todayJst } from '@/lib/date';
 
 const TYPE_LABEL: Record<TransactionType, string> = {
   income: '収入',
@@ -484,6 +484,12 @@ function TransactionFormDialog({
 
   const [pendingAction, setPendingAction] = useState<'submit' | 'continuous' | null>(null);
 
+  const memoSuggestionsQuery = useQuery({
+    queryKey: ['memo-suggestions'],
+    queryFn: () => getMemoSuggestions({ from: addMonthsToDate(todayJst(), -3), to: todayJst() }),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const handleSubmit = form.handleSubmit((values) => {
     const input = buildTransactionInput(values);
     setPendingAction('submit');
@@ -663,12 +669,17 @@ function TransactionFormDialog({
               <FormItem>
                 <FormLabel>摘要</FormLabel>
                 <FormControl>
-                  <Textarea rows={2} placeholder="任意" {...field} />
+                  <Input list="memo-suggestions" placeholder="任意" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
+          <datalist id="memo-suggestions">
+            {(memoSuggestionsQuery.data ?? EMPTY_ARRAY).map((memo) => (
+              <option key={memo} value={memo} />
+            ))}
+          </datalist>
 
           <DialogFooter>
             {transaction ? null : (

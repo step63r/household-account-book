@@ -4,7 +4,7 @@ import type { Budget, Category, Transaction } from '@household/shared';
 import { FakeBudgetRepository } from '../repository/fakeBudgetRepository';
 import { FakeCategoryRepository } from '../repository/fakeCategoryRepository';
 import { FakeTransactionRepository } from '../repository/fakeTransactionRepository';
-import { getBudgetVariance, getCategoryPivot, getTrend } from './aggregationService';
+import { getBudgetVariance, getCategoryPivot, getMemoSuggestions, getTrend } from './aggregationService';
 
 let idCounter = 0;
 function nextId(prefix: string): string {
@@ -255,5 +255,63 @@ describe('getBudgetVariance', () => {
     });
 
     expect(rows.map((row) => row.categoryId)).toEqual(['c-rent', 'c-comms', 'c-food', 'missing-category']);
+  });
+});
+
+describe('getMemoSuggestions', () => {
+  it('rejects an invalid date', async () => {
+    const repository = new FakeTransactionRepository();
+
+    await expect(getMemoSuggestions(repository, 'user-1', { from: 'not-a-date' })).rejects.toThrow(ZodError);
+  });
+
+  it('dedupes memo values and excludes blank/whitespace-only memos', async () => {
+    const repository = new FakeTransactionRepository();
+    await repository.put(makeTransaction({ date: '2026-07-01', type: 'expense', amount: 1000, memo: 'スーパーA' }));
+    await repository.put(makeTransaction({ date: '2026-07-05', type: 'expense', amount: 800, memo: 'スーパーA' }));
+    await repository.put(makeTransaction({ date: '2026-07-10', type: 'expense', amount: 500, memo: '  ' }));
+    await repository.put(makeTransaction({ date: '2026-07-12', type: 'expense', amount: 300, memo: undefined }));
+
+    const suggestions = await getMemoSuggestions(repository, 'user-1', {});
+
+    expect(suggestions).toEqual(['スーパーA']);
+  });
+
+  it('sorts by most recent use, then by use count', async () => {
+    const repository = new FakeTransactionRepository();
+    await repository.put(makeTransaction({ date: '2026-07-01', type: 'expense', amount: 1000, memo: '古い店' }));
+    await repository.put(makeTransaction({ date: '2026-07-20', type: 'expense', amount: 1000, memo: '新しい店' }));
+    await repository.put(makeTransaction({ date: '2026-07-15', type: 'expense', amount: 1000, memo: '中間の店' }));
+    await repository.put(makeTransaction({ date: '2026-07-15', type: 'expense', amount: 500, memo: '中間の店' }));
+
+    const suggestions = await getMemoSuggestions(repository, 'user-1', {
+      from: '2026-07-01',
+      to: '2026-07-31',
+    });
+
+    expect(suggestions).toEqual(['新しい店', '中間の店', '古い店']);
+  });
+
+  it('caps the result at 20 entries', async () => {
+    const repository = new FakeTransactionRepository();
+    for (let i = 0; i < 25; i += 1) {
+      const day = String((i % 28) + 1).padStart(2, '0');
+      await repository.put(
+        makeTransaction({ date: `2026-07-${day}`, type: 'expense', amount: 100, memo: `店舗${i}` }),
+      );
+    }
+
+    const suggestions = await getMemoSuggestions(repository, 'user-1', {});
+
+    expect(suggestions).toHaveLength(20);
+  });
+
+  it('resolves the full history when from/to are omitted', async () => {
+    const repository = new FakeTransactionRepository();
+    await repository.put(makeTransaction({ date: '2010-01-05', type: 'expense', amount: 1500, memo: '古参の店' }));
+
+    const suggestions = await getMemoSuggestions(repository, 'user-1', {});
+
+    expect(suggestions).toEqual(['古参の店']);
   });
 });
