@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { BudgetVarianceRow, CategoryPivotRow, TrendGranularity, TrendPoint } from '@household/shared';
+import { resolvePlanFloorDateString } from '@household/shared';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,7 +12,10 @@ import { AssetFormationChart } from '@/components/charts/AssetFormationChart';
 import { BudgetVarianceList } from '@/components/charts/BudgetVarianceList';
 import { CategoryBreakdownChart } from '@/components/charts/CategoryBreakdownChart';
 import { SummaryStatTiles } from '@/components/charts/SummaryStatTiles';
+import { PlanRestrictionNotice } from '@/components/plan/PlanRestrictionNotice';
 import { getBudgetVariance, getCategoryPivot, getTrend } from '@/lib/aggregation';
+import { isPlanRestrictedError } from '@/lib/api';
+import { useUserProfile } from '@/lib/profile';
 import { toCumulativeSeries } from '@/lib/assetFormation';
 import {
   currentYearMonthJst,
@@ -36,10 +40,15 @@ const EMPTY_TREND_POINTS: TrendPoint[] = [];
 const EMPTY_BUDGET_VARIANCE_ROWS: BudgetVarianceRow[] = [];
 const EMPTY_CATEGORY_PIVOT_ROWS: CategoryPivotRow[] = [];
 
-/** 収支推移グラフの粒度に応じた取得範囲。日/週は選択月、月は選択年、年は選択に関わらず全履歴。 */
-function trendRangeFor(granularity: TrendGranularity, selectedYearMonth: string): { from?: string; to: string } {
+/** 収支推移グラフの粒度に応じた取得範囲。日/週は選択月、月は選択年、年は選択に関わらず全履歴（無料プランはfloorDate以降に制限）。
+ * floorDateは無料プランの参照可能期間下限（YYYY-MM-DD、有料プランはundefined=無制限）。 */
+function trendRangeFor(
+  granularity: TrendGranularity,
+  selectedYearMonth: string,
+  floorDate?: string,
+): { from?: string; to: string } {
   if (granularity === 'year') {
-    return { to: todayJst() };
+    return { from: floorDate, to: todayJst() };
   }
   if (granularity === 'month') {
     return yearDateRange(selectedYearMonth.slice(0, 4));
@@ -54,7 +63,12 @@ export default function DashboardPage() {
   const previousMonth = previousYearMonth(yearMonth);
   const currentMonth = currentYearMonthJst();
 
-  const trendRange = trendRangeFor(granularity, selectedYearMonth);
+  // 無料プランは直近3ヶ月のみ参照可能（有料プランやプラン未確定時はundefined=無制限）。
+  const profileQuery = useUserProfile();
+  const plan = profileQuery.data?.plan;
+  const planFloorDate = plan === 'free' ? resolvePlanFloorDateString('free', new Date()) : undefined;
+
+  const trendRange = trendRangeFor(granularity, selectedYearMonth, planFloorDate);
   const trendQuery = useQuery({
     queryKey: ['aggregation', 'trend', granularity, trendRange.from ?? null, trendRange.to],
     queryFn: async () => getTrend({ granularity, ...trendRange }),
@@ -77,8 +91,8 @@ export default function DashboardPage() {
   });
 
   const assetFormationQuery = useQuery({
-    queryKey: ['aggregation', 'trend', 'month', 'all-history'],
-    queryFn: async () => getTrend({ granularity: 'month', to: todayJst() }),
+    queryKey: ['aggregation', 'trend', 'month', 'all-history', planFloorDate ?? null],
+    queryFn: async () => getTrend({ granularity: 'month', from: planFloorDate, to: todayJst() }),
   });
 
   const isInitialLoading =
@@ -87,6 +101,13 @@ export default function DashboardPage() {
     categoryPivotQuery.isPending ||
     budgetVarianceQuery.isPending ||
     assetFormationQuery.isPending;
+
+  // 無料プランと判明している間、または期間制限をすり抜けて403 PLAN_RESTRICTEDが返ってきた場合に案内カードを出す
+  const planRestricted =
+    plan === 'free' ||
+    [trendQuery, kpiTrendQuery, categoryPivotQuery, budgetVarianceQuery, assetFormationQuery].some(
+      (query) => query.isError && isPlanRestrictedError(query.error),
+    );
 
   const assetFormationData = useMemo(
     () => toCumulativeSeries(assetFormationQuery.data ?? EMPTY_ARRAY),
@@ -107,6 +128,7 @@ export default function DashboardPage() {
           <Input
             type="month"
             value={selectedYearMonth}
+            min={planFloorDate?.slice(0, 7)}
             max={currentMonth}
             onChange={(e) => setSelectedYearMonth(e.target.value)}
             className="w-40"
@@ -127,6 +149,8 @@ export default function DashboardPage() {
         previousExpense={previousKpiPoint?.expense ?? 0}
         isLoading={isInitialLoading}
       />
+
+      {planRestricted && <PlanRestrictionNotice />}
 
       <Card>
         <CardHeader>

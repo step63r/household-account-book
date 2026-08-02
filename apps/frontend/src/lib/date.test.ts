@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { addMonthsToDate, formatPeriodLabel, formatPeriodTick, monthDateRange, previousYearMonth } from './date';
+import {
+  addMonthsToDate,
+  clampDateFrom,
+  formatPeriodLabel,
+  formatPeriodTick,
+  laterDateString,
+  monthDateRange,
+  previousYearMonth,
+} from './date';
 
 describe('previousYearMonth', () => {
   it('通常の月は月を1つ戻す', () => {
@@ -56,5 +64,35 @@ describe('addMonthsToDate', () => {
 
   it('月末日は繰り上がった月の日数に応じて正規化される', () => {
     expect(addMonthsToDate('2026-01-31', 1)).toBe('2026-03-03');
+  });
+});
+
+describe('laterDateString', () => {
+  it('両方指定されている場合は遅い方を返す', () => {
+    expect(laterDateString('2026-01-01', '2026-04-01')).toBe('2026-04-01');
+    expect(laterDateString('2026-04-01', '2026-01-01')).toBe('2026-04-01');
+  });
+
+  it('片方が undefined の場合はもう片方を返す', () => {
+    expect(laterDateString(undefined, '2026-04-01')).toBe('2026-04-01');
+    expect(laterDateString('2026-04-01', undefined)).toBe('2026-04-01');
+  });
+
+  it('両方 undefined の場合は undefined を返す', () => {
+    expect(laterDateString(undefined, undefined)).toBeUndefined();
+  });
+});
+
+describe('clampDateFrom', () => {
+  it('floorDate が未指定なら dateFrom をそのまま返す', () => {
+    expect(clampDateFrom('2026-01-01', undefined)).toBe('2026-01-01');
+  });
+
+  it('dateFrom が floorDate より古い場合は floorDate にクランプする', () => {
+    expect(clampDateFrom('2026-01-01', '2026-05-01')).toBe('2026-05-01');
+  });
+
+  it('dateFrom が floorDate 以降ならそのまま返す', () => {
+    expect(clampDateFrom('2026-06-01', '2026-05-01')).toBe('2026-06-01');
   });
 });

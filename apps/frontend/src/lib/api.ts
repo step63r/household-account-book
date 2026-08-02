@@ -22,6 +22,7 @@
  *   POST   /users/me/withdraw                               src/lib/account.ts
  *   GET    /users/me/consent                                src/lib/consent.ts
  *   POST   /users/me/consent
+ *   GET    /users/me                                         src/lib/profile.ts（plan: 'free' | 'paid'）
  *
  * ログイン/サインアップはこの API を経由しない。CLAUDE.md の設計どおり Cognito User Pool
  * に対して直接（Cognito Hosted UI ではなく `amazon-cognito-identity-js` SDK 経由で）認証する
@@ -105,4 +106,16 @@ export async function apiFetch<TResponse>(
   }
 
   return (await response.json()) as TResponse;
+}
+
+/**
+ * プラン（free/paid）の参照可能期間制限に違反したリクエストかどうかを判定する。
+ * バックエンドは違反時に HTTP 403、ボディ `{ message: string, code: 'PLAN_RESTRICTED' }` を返す。
+ * Dashboard/Transactions の各クエリの `isError` ハンドリングで、通常のエラー表示ではなく
+ * プラン制限の案内表示に倒すかどうかの判定に使う。
+ */
+export function isPlanRestrictedError(error: unknown): boolean {
+  if (!(error instanceof ApiError) || error.status !== 403) return false;
+  const body = error.body as { code?: unknown } | undefined;
+  return body?.code === 'PLAN_RESTRICTED';
 }

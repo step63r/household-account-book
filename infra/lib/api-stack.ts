@@ -71,27 +71,31 @@ const ROUTES: RouteDef[] = [
     method: apigwv2.HttpMethod.GET,
     path: '/transactions',
     handlerFile: 'listTransactions',
-    dynamoActions: ['dynamodb:Query'],
+    // GetItem = DynamoUserRepository.getProfile plan check (free/paid) run on every request.
+    dynamoActions: ['dynamodb:Query', 'dynamodb:GetItem'],
   },
   {
     method: apigwv2.HttpMethod.POST,
     path: '/transactions',
     handlerFile: 'createTransaction',
-    dynamoActions: ['dynamodb:PutItem'],
+    // GetItem = plan check (see above).
+    dynamoActions: ['dynamodb:PutItem', 'dynamodb:GetItem'],
   },
   {
     method: apigwv2.HttpMethod.PUT,
     path: '/transactions/{id}',
     handlerFile: 'updateTransaction',
     // Query+Delete cover the "date changed -> delete old key, put new key" path the handler's TODO describes.
-    dynamoActions: ['dynamodb:Query', 'dynamodb:PutItem', 'dynamodb:DeleteItem'],
+    // GetItem = plan check (see above).
+    dynamoActions: ['dynamodb:Query', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:GetItem'],
   },
   {
     method: apigwv2.HttpMethod.DELETE,
     path: '/transactions/{id}',
     handlerFile: 'deleteTransaction',
     // Query covers locating the item by id (sort key embeds date; see handler TODO for the open question).
-    dynamoActions: ['dynamodb:Query', 'dynamodb:DeleteItem'],
+    // GetItem = plan check (see above).
+    dynamoActions: ['dynamodb:Query', 'dynamodb:DeleteItem', 'dynamodb:GetItem'],
   },
   // Budgets
   {
@@ -107,29 +111,38 @@ const ROUTES: RouteDef[] = [
     dynamoActions: ['dynamodb:PutItem'],
   },
   // Aggregation - read-only, Query TXN#/CATEGORY#/BUDGET# ranges and reduce in Lambda memory (CLAUDE.md)
+  // GetItem on all four = DynamoUserRepository.getProfile plan check (free/paid) run on every request.
   {
     method: apigwv2.HttpMethod.GET,
     path: '/aggregation/trend',
     handlerFile: 'getTrend',
-    dynamoActions: ['dynamodb:Query'],
+    dynamoActions: ['dynamodb:Query', 'dynamodb:GetItem'],
   },
   {
     method: apigwv2.HttpMethod.GET,
     path: '/aggregation/category-pivot',
     handlerFile: 'getCategoryPivot',
-    dynamoActions: ['dynamodb:Query'],
+    dynamoActions: ['dynamodb:Query', 'dynamodb:GetItem'],
   },
   {
     method: apigwv2.HttpMethod.GET,
     path: '/aggregation/budget-variance',
     handlerFile: 'getBudgetVariance',
-    dynamoActions: ['dynamodb:Query'],
+    dynamoActions: ['dynamodb:Query', 'dynamodb:GetItem'],
   },
   {
     method: apigwv2.HttpMethod.GET,
     path: '/aggregation/memo-suggestions',
     handlerFile: 'getMemoSuggestions',
-    dynamoActions: ['dynamodb:Query'],
+    dynamoActions: ['dynamodb:Query', 'dynamodb:GetItem'],
+  },
+  // Current user profile (free/paid plan for frontend gating). Lazily creates the PROFILE item
+  // on first access, same pattern as getConsentStatus below.
+  {
+    method: apigwv2.HttpMethod.GET,
+    path: '/users/me',
+    handlerFile: 'getProfile',
+    dynamoActions: ['dynamodb:GetItem', 'dynamodb:PutItem'],
   },
   // Account withdrawal (logical delete only - see the module-level note on the physical-deletion batch)
   {

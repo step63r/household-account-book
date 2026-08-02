@@ -315,3 +315,141 @@ describe('getMemoSuggestions', () => {
     expect(suggestions).toEqual(['古参の店']);
   });
 });
+
+describe('plan-based access window', () => {
+  // Computed relative to the actual wall clock so these tests stay correct regardless of
+  // when they run (see the identical helper in transactionService.test.ts).
+  function monthsAgoDate(months: number): string {
+    const d = new Date();
+    d.setMonth(d.getMonth() - months);
+    return d.toISOString().slice(0, 10);
+  }
+  const dateOutsideWindow = monthsAgoDate(4);
+  const dateWithinWindow = monthsAgoDate(1);
+
+  describe('getTrend', () => {
+    it('clamps `from` up to the free-plan floor date for a free plan', async () => {
+      const repository = new FakeTransactionRepository();
+      await repository.put(makeTransaction({ date: dateOutsideWindow, type: 'expense', amount: 1000, categoryId: 'c1' }));
+      await repository.put(makeTransaction({ date: dateWithinWindow, type: 'expense', amount: 2000, categoryId: 'c1' }));
+
+      const trend = await getTrend(
+        repository,
+        'user-1',
+        { granularity: 'day', from: '2010-01-01', to: dateWithinWindow },
+        'free',
+      );
+
+      expect(trend).toEqual([{ period: dateWithinWindow, income: 0, expense: 2000, transfer: 0 }]);
+    });
+
+    it('leaves `from` untouched for a paid plan', async () => {
+      const repository = new FakeTransactionRepository();
+      await repository.put(makeTransaction({ date: dateOutsideWindow, type: 'expense', amount: 1000, categoryId: 'c1' }));
+
+      const trend = await getTrend(
+        repository,
+        'user-1',
+        { granularity: 'day', from: '2010-01-01', to: dateOutsideWindow },
+        'paid',
+      );
+
+      expect(trend).toEqual([{ period: dateOutsideWindow, income: 0, expense: 1000, transfer: 0 }]);
+    });
+  });
+
+  describe('getCategoryPivot', () => {
+    it('clamps `from` up to the free-plan floor date for a free plan', async () => {
+      const transactionRepository = new FakeTransactionRepository();
+      const categoryRepository = new FakeCategoryRepository();
+      await categoryRepository.put(makeCategory({ id: 'c1', name: '食費' }));
+      await transactionRepository.put(
+        makeTransaction({ date: dateOutsideWindow, type: 'expense', amount: 1000, categoryId: 'c1' }),
+      );
+      await transactionRepository.put(
+        makeTransaction({ date: dateWithinWindow, type: 'expense', amount: 500, categoryId: 'c1' }),
+      );
+
+      const pivot = await getCategoryPivot(
+        transactionRepository,
+        categoryRepository,
+        'user-1',
+        { from: '2010-01-01', to: dateWithinWindow },
+        'free',
+      );
+
+      expect(pivot[0]!.amountsByPeriod).toEqual({ [dateWithinWindow.slice(0, 7)]: 500 });
+    });
+  });
+
+  describe('getBudgetVariance', () => {
+    it('clamps yearMonth up to the free-plan floor month for a free plan', async () => {
+      const transactionRepository = new FakeTransactionRepository();
+      const budgetRepository = new FakeBudgetRepository();
+      const categoryRepository = new FakeCategoryRepository();
+      await categoryRepository.put(makeCategory({ id: 'c1', name: '食費' }));
+      // The floor month is exactly 3 months before today - the same computation
+      // clampYearMonthParam performs internally, mirrored here for the assertion.
+      const floorMonth = monthsAgoDate(3).slice(0, 7);
+      await budgetRepository.put(makeBudget({ yearMonth: floorMonth, categoryId: 'c1', amount: 1000 }));
+      await transactionRepository.put(
+        makeTransaction({ date: `${floorMonth}-01`, type: 'expense', amount: 800, categoryId: 'c1' }),
+      );
+      // An out-of-window month's budget must not leak into the clamped result.
+      await budgetRepository.put(makeBudget({ yearMonth: '2010-01', categoryId: 'c1', amount: 5000 }));
+
+      const rows = await getBudgetVariance(
+        transactionRepository,
+        budgetRepository,
+        categoryRepository,
+        'user-1',
+        { yearMonth: '2010-01' },
+        'free',
+      );
+
+      expect(rows).toEqual([
+        { categoryId: 'c1', categoryName: '食費', budgetAmount: 1000, actualAmount: 800, varianceAmount: -200 },
+      ]);
+    });
+
+    it('leaves yearMonth untouched for a paid plan', async () => {
+      const transactionRepository = new FakeTransactionRepository();
+      const budgetRepository = new FakeBudgetRepository();
+      const categoryRepository = new FakeCategoryRepository();
+      await categoryRepository.put(makeCategory({ id: 'c1', name: '食費' }));
+      await budgetRepository.put(makeBudget({ yearMonth: '2010-01', categoryId: 'c1', amount: 5000 }));
+      await transactionRepository.put(
+        makeTransaction({ date: '2010-01-10', type: 'expense', amount: 4000, categoryId: 'c1' }),
+      );
+
+      const rows = await getBudgetVariance(
+        transactionRepository,
+        budgetRepository,
+        categoryRepository,
+        'user-1',
+        { yearMonth: '2010-01' },
+        'paid',
+      );
+
+      expect(rows).toEqual([
+        { categoryId: 'c1', categoryName: '食費', budgetAmount: 5000, actualAmount: 4000, varianceAmount: -1000 },
+      ]);
+    });
+  });
+
+  describe('getMemoSuggestions', () => {
+    it('clamps `from` up to the free-plan floor date for a free plan', async () => {
+      const repository = new FakeTransactionRepository();
+      await repository.put(
+        makeTransaction({ date: dateOutsideWindow, type: 'expense', amount: 1000, memo: '古い店' }),
+      );
+      await repository.put(
+        makeTransaction({ date: dateWithinWindow, type: 'expense', amount: 1000, memo: '新しい店' }),
+      );
+
+      const suggestions = await getMemoSuggestions(repository, 'user-1', { from: '2010-01-01' }, 'free');
+
+      expect(suggestions).toEqual(['新しい店']);
+    });
+  });
+});

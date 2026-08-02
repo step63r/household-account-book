@@ -5,11 +5,14 @@ import { jsonResponse } from './response';
 /** An error that should be surfaced to the caller with a specific HTTP status code. */
 export class HttpError extends Error {
   readonly statusCode: number;
+  /** Machine-readable code so the frontend can branch on error type without parsing `message`. */
+  readonly code?: string;
 
-  constructor(statusCode: number, message: string) {
+  constructor(statusCode: number, message: string, code?: string) {
     super(message);
     this.name = 'HttpError';
     this.statusCode = statusCode;
+    this.code = code;
   }
 }
 
@@ -39,7 +42,7 @@ export function handleError(error: unknown): APIGatewayProxyResultV2 {
     });
   }
   if (error instanceof HttpError) {
-    return jsonResponse(error.statusCode, { message: error.message });
+    return jsonResponse(error.statusCode, { message: error.message, code: error.code });
   }
 
   // Unexpected error: log full detail server-side, don't leak internals to the caller.

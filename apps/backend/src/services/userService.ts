@@ -1,4 +1,10 @@
-import { CURRENT_TERMS_VERSION, type ConsentStatus, type User } from '@household/shared';
+import {
+  CURRENT_TERMS_VERSION,
+  type ConsentStatus,
+  type User,
+  type UserPlan,
+  type UserProfileResponse,
+} from '@household/shared';
 import type { UserRepository } from '../repository/userRepository';
 
 const DELETION_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000; // CLAUDE.md: 30日程度の猶予期間
@@ -18,7 +24,7 @@ export async function requestWithdrawal(
 ): Promise<User> {
   const existing = await repository.getProfile(userId);
   if (existing?.status === 'pendingDeletion') {
-    return existing;
+    return withPlanDefault(existing);
   }
 
   const now = new Date();
@@ -31,6 +37,7 @@ export async function requestWithdrawal(
     status: 'pendingDeletion',
     deletionRequestedAt: nowIso,
     deletionScheduledAt,
+    plan: existing?.plan ?? 'free',
     createdAt: existing?.createdAt ?? nowIso,
     updatedAt: nowIso,
   };
@@ -48,7 +55,39 @@ function toConsentStatus(user: User): ConsentStatus {
 }
 
 function defaultProfile(userId: string, email: string, now: string): User {
-  return { id: userId, email, status: 'active', createdAt: now, updatedAt: now };
+  return { id: userId, email, status: 'active', plan: 'free', createdAt: now, updatedAt: now };
+}
+
+/**
+ * plan フィールド追加前に作成された既存 PROFILE アイテムを free 扱いで補完する。
+ * DynamoDB はスキーマレスなので、明示的なバックフィルバッチは行わず読み込み側で吸収する。
+ */
+function withPlanDefault(user: User): User {
+  return user.plan ? user : { ...user, plan: 'free' };
+}
+
+/** 現在のプランを返す（PROFILE未作成ユーザーは free 扱い）。決済連携前の読み取り専用ヘルパー。 */
+export async function getUserPlan(repository: UserRepository, userId: string): Promise<UserPlan> {
+  const existing = await repository.getProfile(userId);
+  return existing ? withPlanDefault(existing).plan : 'free';
+}
+
+/**
+ * GET /users/me 用のプロフィール（プラン判定に必要な最小限のフィールドのみ）を返す。
+ * getConsentStatus と同じく、プロフィール未作成の場合はここで PROFILE アイテムを遅延作成する。
+ */
+export async function getMyProfile(
+  repository: UserRepository,
+  userId: string,
+  email: string,
+): Promise<UserProfileResponse> {
+  const existing = await repository.getProfile(userId);
+  if (existing) return { plan: withPlanDefault(existing).plan };
+
+  const now = new Date().toISOString();
+  const user = defaultProfile(userId, email, now);
+  await repository.put(user);
+  return { plan: user.plan };
 }
 
 /**
@@ -63,7 +102,7 @@ export async function getConsentStatus(
   email: string,
 ): Promise<ConsentStatus> {
   const existing = await repository.getProfile(userId);
-  if (existing) return toConsentStatus(existing);
+  if (existing) return toConsentStatus(withPlanDefault(existing));
 
   const now = new Date().toISOString();
   const user = defaultProfile(userId, email, now);
@@ -80,7 +119,7 @@ export async function recordConsent(
   const now = new Date().toISOString();
   const existing = await repository.getProfile(userId);
   const user: User = {
-    ...(existing ?? defaultProfile(userId, email, now)),
+    ...(existing ? withPlanDefault(existing) : defaultProfile(userId, email, now)),
     termsAgreedVersion: CURRENT_TERMS_VERSION,
     termsAgreedAt: now,
     updatedAt: now,

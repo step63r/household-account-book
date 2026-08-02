@@ -216,3 +216,148 @@ describe('deleteTransaction', () => {
     await expect(repository.getById('user-1', transaction.id)).resolves.toBeUndefined();
   });
 });
+
+describe('plan-based access window', () => {
+  // Computed relative to the actual wall clock (not a fixed date) so these tests stay
+  // correct regardless of when they run - "outside" is always well past the 3-month floor,
+  // "within" is always well inside it.
+  function monthsAgoDate(months: number): string {
+    const d = new Date();
+    d.setMonth(d.getMonth() - months);
+    return d.toISOString().slice(0, 10);
+  }
+  const dateOutsideWindow = monthsAgoDate(4);
+  const dateWithinWindow = monthsAgoDate(1);
+  const dateFarInThePast = '2010-01-01';
+
+  describe('createTransaction', () => {
+    it('rejects a free-plan transaction dated before the 3-month window', async () => {
+      const repository = new FakeTransactionRepository();
+
+      await expect(
+        createTransaction(repository, 'user-1', { ...validExpense, date: dateOutsideWindow }, 'free'),
+      ).rejects.toThrow(HttpError);
+    });
+
+    it('accepts a free-plan transaction within the 3-month window', async () => {
+      const repository = new FakeTransactionRepository();
+
+      const transaction = await createTransaction(
+        repository,
+        'user-1',
+        { ...validExpense, date: dateWithinWindow },
+        'free',
+      );
+
+      expect(transaction.date).toBe(dateWithinWindow);
+    });
+
+    it('accepts a paid-plan transaction dated far in the past (unlimited)', async () => {
+      const repository = new FakeTransactionRepository();
+
+      const transaction = await createTransaction(
+        repository,
+        'user-1',
+        { ...validExpense, date: dateFarInThePast },
+        'paid',
+      );
+
+      expect(transaction.date).toBe(dateFarInThePast);
+    });
+  });
+
+  describe('listTransactions', () => {
+    it('clamps `from` up to the free-plan floor date instead of erroring', async () => {
+      const repository = new FakeTransactionRepository();
+      await createTransaction(repository, 'user-1', { ...validExpense, date: dateOutsideWindow }, 'paid');
+      await createTransaction(repository, 'user-1', { ...validExpense, date: dateWithinWindow }, 'paid');
+
+      const transactions = await listTransactions(repository, 'user-1', { from: dateFarInThePast }, 'free');
+
+      expect(transactions.map((t) => t.date)).toEqual([dateWithinWindow]);
+    });
+
+    it('leaves `from` untouched for a paid plan', async () => {
+      const repository = new FakeTransactionRepository();
+      await createTransaction(repository, 'user-1', { ...validExpense, date: dateOutsideWindow }, 'paid');
+
+      const transactions = await listTransactions(repository, 'user-1', { from: dateFarInThePast }, 'paid');
+
+      expect(transactions.map((t) => t.date)).toEqual([dateOutsideWindow]);
+    });
+  });
+
+  describe('updateTransaction', () => {
+    it('rejects updating a free-plan transaction that is already outside the window', async () => {
+      const repository = new FakeTransactionRepository();
+      const transaction = await createTransaction(
+        repository,
+        'user-1',
+        { ...validExpense, date: dateOutsideWindow },
+        'paid',
+      );
+
+      await expect(
+        updateTransaction(repository, 'user-1', transaction.id, { amount: 999 }, 'free'),
+      ).rejects.toThrow(HttpError);
+    });
+
+    it('rejects moving a free-plan transaction to a date outside the window', async () => {
+      const repository = new FakeTransactionRepository();
+      const transaction = await createTransaction(
+        repository,
+        'user-1',
+        { ...validExpense, date: dateWithinWindow },
+        'free',
+      );
+
+      await expect(
+        updateTransaction(repository, 'user-1', transaction.id, { date: dateOutsideWindow }, 'free'),
+      ).rejects.toThrow(HttpError);
+    });
+
+    it('allows a paid-plan update regardless of date', async () => {
+      const repository = new FakeTransactionRepository();
+      const transaction = await createTransaction(
+        repository,
+        'user-1',
+        { ...validExpense, date: dateFarInThePast },
+        'paid',
+      );
+
+      const updated = await updateTransaction(repository, 'user-1', transaction.id, { amount: 500 }, 'paid');
+
+      expect(updated.amount).toBe(500);
+    });
+  });
+
+  describe('deleteTransaction', () => {
+    it('rejects deleting a free-plan transaction outside the window', async () => {
+      const repository = new FakeTransactionRepository();
+      const transaction = await createTransaction(
+        repository,
+        'user-1',
+        { ...validExpense, date: dateOutsideWindow },
+        'paid',
+      );
+
+      await expect(deleteTransaction(repository, 'user-1', transaction.id, 'free')).rejects.toThrow(
+        HttpError,
+      );
+    });
+
+    it('allows deleting a paid-plan transaction regardless of date', async () => {
+      const repository = new FakeTransactionRepository();
+      const transaction = await createTransaction(
+        repository,
+        'user-1',
+        { ...validExpense, date: dateFarInThePast },
+        'paid',
+      );
+
+      await deleteTransaction(repository, 'user-1', transaction.id, 'paid');
+
+      await expect(repository.getById('user-1', transaction.id)).resolves.toBeUndefined();
+    });
+  });
+});

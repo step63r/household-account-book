@@ -6,30 +6,38 @@ import {
   type CategoryPivotRow,
   type TrendGranularity,
   type TrendPoint,
+  type UserPlan,
 } from '@household/shared';
 import type { BudgetRepository } from '../repository/budgetRepository';
 import type { CategoryRepository } from '../repository/categoryRepository';
 import type { TransactionRepository } from '../repository/transactionRepository';
+import { clampFromParam, clampYearMonthParam } from '../lib/planAccess';
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD');
 
-const trendQuerySchema = z.object({
+/**
+ * Exported so handlers can validate query params up front, before spending a DynamoDB round
+ * trip on getUserPlan() for the free/paid plan check - keeps the "requireUserId()/schema
+ * validation short-circuit before any repository call" invariant the handler unit tests rely
+ * on (see apps/backend/src/handlers/aggregation.test.ts's module doc comment).
+ */
+export const trendQuerySchema = z.object({
   granularity: trendGranularitySchema,
   from: dateSchema.optional(),
   to: dateSchema,
 });
 
-const categoryPivotQuerySchema = z.object({
+export const categoryPivotQuerySchema = z.object({
   from: dateSchema,
   to: dateSchema,
   granularity: trendGranularitySchema.default('month'),
 });
 
-const budgetVarianceQuerySchema = z.object({
+export const budgetVarianceQuerySchema = z.object({
   yearMonth: yearMonthSchema,
 });
 
-const memoSuggestionsQuerySchema = z.object({
+export const memoSuggestionsQuerySchema = z.object({
   from: dateSchema.optional(),
   to: dateSchema.optional(),
 });
@@ -71,9 +79,11 @@ export async function getTrend(
   transactionRepository: TransactionRepository,
   userId: string,
   rawQuery: unknown,
+  plan: UserPlan = 'paid',
 ): Promise<TrendPoint[]> {
   const { granularity, from, to } = trendQuerySchema.parse(rawQuery);
-  const transactions = await transactionRepository.listByUser(userId, { from, to });
+  const clampedFrom = clampFromParam(plan, from);
+  const transactions = await transactionRepository.listByUser(userId, { from: clampedFrom, to });
 
   const buckets = new Map<string, { income: number; expense: number; transfer: number }>();
   for (const transaction of transactions) {
@@ -100,10 +110,12 @@ export async function getCategoryPivot(
   categoryRepository: CategoryRepository,
   userId: string,
   rawQuery: unknown,
+  plan: UserPlan = 'paid',
 ): Promise<CategoryPivotRow[]> {
   const { from, to, granularity } = categoryPivotQuerySchema.parse(rawQuery);
+  const clampedFrom = clampFromParam(plan, from);
   const [transactions, categories] = await Promise.all([
-    transactionRepository.listByUser(userId, { from, to }),
+    transactionRepository.listByUser(userId, { from: clampedFrom, to }),
     categoryRepository.listByUser(userId),
   ]);
   const categoryById = new Map(categories.map((category) => [category.id, category]));
@@ -132,8 +144,12 @@ export async function getBudgetVariance(
   categoryRepository: CategoryRepository,
   userId: string,
   rawQuery: unknown,
+  plan: UserPlan = 'paid',
 ): Promise<BudgetVarianceRow[]> {
-  const { yearMonth } = budgetVarianceQuerySchema.parse(rawQuery);
+  const { yearMonth: rawYearMonth } = budgetVarianceQuerySchema.parse(rawQuery);
+  // free plan: silently clamp up to the accessible window instead of erroring, same as
+  // clampFromParam for the date-range endpoints.
+  const yearMonth = clampYearMonthParam(plan, rawYearMonth);
   // Lexicographic bound over YYYY-MM-DD strings: "-31" safely covers every month's actual
   // last day (a nonexistent "-31" for a 30-day month just matches nothing extra).
   const [transactions, budgets, categories] = await Promise.all([
@@ -192,9 +208,12 @@ export async function getMemoSuggestions(
   transactionRepository: TransactionRepository,
   userId: string,
   rawQuery: unknown,
+  plan: UserPlan = 'paid',
 ): Promise<string[]> {
   const { from, to } = memoSuggestionsQuerySchema.parse(rawQuery);
-  const transactions = await transactionRepository.listByUser(userId, { from, to });
+  // Same from/to period-filter semantics as listTransactions, so clamp identically.
+  const clampedFrom = clampFromParam(plan, from);
+  const transactions = await transactionRepository.listByUser(userId, { from: clampedFrom, to });
 
   const stats = new Map<string, { count: number; lastUsedAt: string }>();
   for (const transaction of transactions) {

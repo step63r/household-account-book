@@ -94,3 +94,18 @@ export function addMonthsToDate(dateStr: string, months: number): string {
   const day = Number(dayStr);
   return new Date(Date.UTC(year, month - 1 + months, day)).toISOString().slice(0, 10);
 }
+
+/** 2つのISO日付文字列（yyyy-MM-dd）のうち遅い方を返す。片方が undefined ならもう片方をそのまま返す。
+ * 取引一覧の dateFrom の下限（範囲幅の制約とプラン制限floorの両方を満たす値）を求めるのに使う。 */
+export function laterDateString(a: string | undefined, b: string | undefined): string | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  return a > b ? a : b;
+}
+
+/** dateFrom が floorDate より古い場合、floorDate にクランプする（無料プランの参照可能期間制限用）。
+ * floorDate が undefined（有料プラン=無制限）の場合は dateFrom をそのまま返す。 */
+export function clampDateFrom(dateFrom: string, floorDate: string | undefined): string {
+  if (!floorDate) return dateFrom;
+  return dateFrom < floorDate ? floorDate : dateFrom;
+}

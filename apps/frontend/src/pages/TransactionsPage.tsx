@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
@@ -6,6 +6,7 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   createTransactionInputSchema,
   INCOME_SOURCE_PRESETS,
+  resolvePlanFloorDateString,
   type Category,
   type CreateTransactionInput,
   type Transaction,
@@ -42,6 +43,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { MultiSelectFilter } from '@/components/ui/multi-select-filter';
+import { PlanRestrictionNotice } from '@/components/plan/PlanRestrictionNotice';
 import { getCategories } from '@/lib/categories';
 import {
   createTransaction,
@@ -50,8 +52,10 @@ import {
   updateTransaction,
 } from '@/lib/transactions';
 import { getMemoSuggestions } from '@/lib/aggregation';
+import { isPlanRestrictedError } from '@/lib/api';
+import { useUserProfile } from '@/lib/profile';
 import { EMPTY_ARRAY } from '@/lib/utils';
-import { addMonthsToDate, formatDate, todayJst } from '@/lib/date';
+import { addMonthsToDate, clampDateFrom, formatDate, laterDateString, todayJst } from '@/lib/date';
 
 const TYPE_LABEL: Record<TransactionType, string> = {
   income: '収入',
@@ -139,6 +143,11 @@ const MAX_DATE_RANGE_MONTHS = 3;
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
 
+  // 無料プランは直近3ヶ月のみ参照・登録・更新可能（有料プランやプラン未確定時はundefined=無制限）。
+  const profileQuery = useUserProfile();
+  const plan = profileQuery.data?.plan;
+  const floorDate = plan === 'free' ? resolvePlanFloorDateString('free', new Date()) : undefined;
+
   const defaultRange = monthDateRange(currentYearMonth());
   const [dateFrom, setDateFrom] = useState(defaultRange.from);
   const [dateTo, setDateTo] = useState(defaultRange.to);
@@ -148,6 +157,12 @@ export default function TransactionsPage() {
   const [amountMax, setAmountMax] = useState(NaN);
   const [memoQuery, setMemoQuery] = useState('');
 
+  // ページ読み込み時点（あるいはプラン判明後）のdateFromがfloorDateより古い場合はfloorDateにクランプする
+  useEffect(() => {
+    if (!floorDate) return;
+    setDateFrom((prev) => clampDateFrom(prev, floorDate));
+  }, [floorDate]);
+
   const transactionsQuery = useQuery({
     queryKey: ['transactions', dateFrom, dateTo],
     queryFn: async () => getTransactions({ from: dateFrom || undefined, to: dateTo || undefined }),
@@ -156,6 +171,10 @@ export default function TransactionsPage() {
   const transactions = transactionsQuery.data ?? EMPTY_ARRAY;
   const categories = categoriesQuery.data ?? EMPTY_ARRAY;
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+
+  // 無料プランと判明している間、または期間制限をすり抜けて403 PLAN_RESTRICTEDが返ってきた場合に案内カードを出す
+  const planRestricted =
+    plan === 'free' || (transactionsQuery.isError && isPlanRestrictedError(transactionsQuery.error));
 
   /** 費目フィルタの選択肢。費目マスタ全件ではなく、今フェッチしている取引に実際に登場する費目のみ */
   const displayedCategoryOptions = useMemo(() => {
@@ -167,31 +186,34 @@ export default function TransactionsPage() {
       .map((c) => ({ value: c.id, label: c.name }));
   }, [transactions, categories]);
 
-  /** FROMを変更。TOがFROMより前になる場合はTOをFROMに合わせ、範囲が最大期間を超える場合はTOを詰める。 */
+  /** FROMを変更。無料プランのfloorDateより古い値はクランプする。
+   * TOがFROMより前になる場合はTOをFROMに合わせ、範囲が最大期間を超える場合はTOを詰める。 */
   function handleDateFromChange(value: string) {
-    setDateFrom(value);
-    if (!value) return;
-    if (dateTo && dateTo < value) {
-      setDateTo(value);
+    const clamped = clampDateFrom(value, floorDate);
+    setDateFrom(clamped);
+    if (!clamped) return;
+    if (dateTo && dateTo < clamped) {
+      setDateTo(clamped);
       return;
     }
-    const maxTo = addMonthsToDate(value, MAX_DATE_RANGE_MONTHS);
+    const maxTo = addMonthsToDate(clamped, MAX_DATE_RANGE_MONTHS);
     if (dateTo && dateTo > maxTo) {
       setDateTo(maxTo);
     }
   }
 
-  /** TOを変更。FROMがTOより後になる場合はFROMをTOに合わせ、範囲が最大期間を超える場合はFROMを詰める。 */
+  /** TOを変更。FROMがTOより後になる場合はFROMをTOに合わせ、範囲が最大期間を超える場合はFROMを詰める。
+   * いずれも無料プランのfloorDateより古くはしない。 */
   function handleDateToChange(value: string) {
     setDateTo(value);
     if (!value) return;
     if (dateFrom && dateFrom > value) {
-      setDateFrom(value);
+      setDateFrom(clampDateFrom(value, floorDate));
       return;
     }
     const minFrom = addMonthsToDate(value, -MAX_DATE_RANGE_MONTHS);
     if (dateFrom && dateFrom < minFrom) {
-      setDateFrom(minFrom);
+      setDateFrom(laterDateString(minFrom, floorDate) ?? minFrom);
     }
   }
 
@@ -289,6 +311,8 @@ export default function TransactionsPage() {
         </Dialog>
       </div>
 
+      {planRestricted && <PlanRestrictionNotice />}
+
       <Card>
         <CardHeader>
           <CardTitle>取引一覧</CardTitle>
@@ -300,7 +324,7 @@ export default function TransactionsPage() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => handleDateFromChange(e.target.value)}
-                min={dateTo ? addMonthsToDate(dateTo, -MAX_DATE_RANGE_MONTHS) : undefined}
+                min={laterDateString(dateTo ? addMonthsToDate(dateTo, -MAX_DATE_RANGE_MONTHS) : undefined, floorDate)}
                 max={dateTo || undefined}
                 className="w-36"
               />
@@ -351,6 +375,11 @@ export default function TransactionsPage() {
 
           {transactionsQuery.isPending ? (
             <TransactionsTableSkeleton />
+          ) : transactionsQuery.isError ? (
+            // プラン制限エラーは上部の案内カードで説明済みのため、ここでは二重表示しない
+            isPlanRestrictedError(transactionsQuery.error) ? null : (
+              <p className="py-8 text-center text-sm text-destructive">取引の読み込みに失敗しました</p>
+            )
           ) : sortedTransactions.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">取引がまだありません</p>
           ) : (

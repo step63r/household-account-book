@@ -5,3 +5,4 @@ export * from './budget';
 export * from './user';
 export * from './aggregation';
 export * from './consent';
+export * from './plan';

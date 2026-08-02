@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { CURRENT_TERMS_VERSION } from '@household/shared';
+import { CURRENT_TERMS_VERSION, type User } from '@household/shared';
 import { FakeUserRepository } from '../repository/fakeUserRepository';
-import { getConsentStatus, recordConsent, requestWithdrawal } from './userService';
+import { getConsentStatus, getMyProfile, getUserPlan, recordConsent, requestWithdrawal } from './userService';
+
+/** Simulates a PROFILE item written before the `plan` field existed (DynamoDB is schemaless,
+ * so such legacy items are still readable at runtime even though `plan` is now required by
+ * the `User` type) - the same cast pattern each pre-existing "legacy record" test below uses. */
+function legacyProfile(overrides: Omit<User, 'plan'>): User {
+  return overrides as User;
+}
 
 describe('requestWithdrawal', () => {
   it('creates a pendingDeletion profile with deletionScheduledAt 30 days out', async () => {
@@ -30,13 +37,15 @@ describe('requestWithdrawal', () => {
 
   it('preserves the original createdAt across the status transition', async () => {
     const repository = new FakeUserRepository();
-    await repository.put({
-      id: 'user-1',
-      email: 'user1@example.com',
-      status: 'active',
-      createdAt: '2020-01-01T00:00:00.000Z',
-      updatedAt: '2020-01-01T00:00:00.000Z',
-    });
+    await repository.put(
+      legacyProfile({
+        id: 'user-1',
+        email: 'user1@example.com',
+        status: 'active',
+        createdAt: '2020-01-01T00:00:00.000Z',
+        updatedAt: '2020-01-01T00:00:00.000Z',
+      }),
+    );
 
     const user = await requestWithdrawal(repository, 'user-1', 'user1@example.com');
 
@@ -71,15 +80,17 @@ describe('getConsentStatus', () => {
 
   it('reports mustAgree: false when the stored version matches the current version', async () => {
     const repository = new FakeUserRepository();
-    await repository.put({
-      id: 'user-1',
-      email: 'user1@example.com',
-      status: 'active',
-      termsAgreedVersion: CURRENT_TERMS_VERSION,
-      termsAgreedAt: '2020-01-01T00:00:00.000Z',
-      createdAt: '2020-01-01T00:00:00.000Z',
-      updatedAt: '2020-01-01T00:00:00.000Z',
-    });
+    await repository.put(
+      legacyProfile({
+        id: 'user-1',
+        email: 'user1@example.com',
+        status: 'active',
+        termsAgreedVersion: CURRENT_TERMS_VERSION,
+        termsAgreedAt: '2020-01-01T00:00:00.000Z',
+        createdAt: '2020-01-01T00:00:00.000Z',
+        updatedAt: '2020-01-01T00:00:00.000Z',
+      }),
+    );
 
     const status = await getConsentStatus(repository, 'user-1', 'user1@example.com');
 
@@ -88,15 +99,17 @@ describe('getConsentStatus', () => {
 
   it('reports mustAgree: true when the stored version is stale', async () => {
     const repository = new FakeUserRepository();
-    await repository.put({
-      id: 'user-1',
-      email: 'user1@example.com',
-      status: 'active',
-      termsAgreedVersion: '2020-01-01',
-      termsAgreedAt: '2020-01-01T00:00:00.000Z',
-      createdAt: '2020-01-01T00:00:00.000Z',
-      updatedAt: '2020-01-01T00:00:00.000Z',
-    });
+    await repository.put(
+      legacyProfile({
+        id: 'user-1',
+        email: 'user1@example.com',
+        status: 'active',
+        termsAgreedVersion: '2020-01-01',
+        termsAgreedAt: '2020-01-01T00:00:00.000Z',
+        createdAt: '2020-01-01T00:00:00.000Z',
+        updatedAt: '2020-01-01T00:00:00.000Z',
+      }),
+    );
 
     const status = await getConsentStatus(repository, 'user-1', 'user1@example.com');
 
@@ -123,13 +136,15 @@ describe('recordConsent', () => {
 
   it('preserves existing profile fields (createdAt, status) when recording consent', async () => {
     const repository = new FakeUserRepository();
-    await repository.put({
-      id: 'user-1',
-      email: 'user1@example.com',
-      status: 'active',
-      createdAt: '2020-01-01T00:00:00.000Z',
-      updatedAt: '2020-01-01T00:00:00.000Z',
-    });
+    await repository.put(
+      legacyProfile({
+        id: 'user-1',
+        email: 'user1@example.com',
+        status: 'active',
+        createdAt: '2020-01-01T00:00:00.000Z',
+        updatedAt: '2020-01-01T00:00:00.000Z',
+      }),
+    );
 
     const status = await recordConsent(repository, 'user-1', 'user1@example.com');
 
@@ -146,5 +161,90 @@ describe('recordConsent', () => {
     await recordConsent(repository, 'user-1', 'user1@example.com');
 
     await expect(repository.getProfile('user-2')).resolves.toBeUndefined();
+  });
+});
+
+describe('getUserPlan', () => {
+  it('returns free for a user with no PROFILE item yet', async () => {
+    const repository = new FakeUserRepository();
+
+    await expect(getUserPlan(repository, 'user-1')).resolves.toBe('free');
+  });
+
+  it('returns free for a legacy PROFILE item written before the plan field existed', async () => {
+    const repository = new FakeUserRepository();
+    await repository.put(
+      legacyProfile({
+        id: 'user-1',
+        email: 'user1@example.com',
+        status: 'active',
+        createdAt: '2020-01-01T00:00:00.000Z',
+        updatedAt: '2020-01-01T00:00:00.000Z',
+      }),
+    );
+
+    await expect(getUserPlan(repository, 'user-1')).resolves.toBe('free');
+  });
+
+  it('returns the stored plan for an existing profile', async () => {
+    const repository = new FakeUserRepository();
+    await repository.put({
+      id: 'user-1',
+      email: 'user1@example.com',
+      status: 'active',
+      plan: 'paid',
+      createdAt: '2020-01-01T00:00:00.000Z',
+      updatedAt: '2020-01-01T00:00:00.000Z',
+    });
+
+    await expect(getUserPlan(repository, 'user-1')).resolves.toBe('paid');
+  });
+});
+
+describe('getMyProfile', () => {
+  it('lazily creates a profile with plan: free for a brand-new user', async () => {
+    const repository = new FakeUserRepository();
+
+    const profile = await getMyProfile(repository, 'user-1', 'user1@example.com');
+
+    expect(profile).toEqual({ plan: 'free' });
+    await expect(repository.getProfile('user-1')).resolves.toMatchObject({
+      id: 'user-1',
+      email: 'user1@example.com',
+      plan: 'free',
+    });
+  });
+
+  it('returns the stored plan for an existing profile without mutating it', async () => {
+    const repository = new FakeUserRepository();
+    await repository.put({
+      id: 'user-1',
+      email: 'user1@example.com',
+      status: 'active',
+      plan: 'paid',
+      createdAt: '2020-01-01T00:00:00.000Z',
+      updatedAt: '2020-01-01T00:00:00.000Z',
+    });
+
+    const profile = await getMyProfile(repository, 'user-1', 'user1@example.com');
+
+    expect(profile).toEqual({ plan: 'paid' });
+  });
+
+  it('defaults a legacy profile missing the plan field to free', async () => {
+    const repository = new FakeUserRepository();
+    await repository.put(
+      legacyProfile({
+        id: 'user-1',
+        email: 'user1@example.com',
+        status: 'active',
+        createdAt: '2020-01-01T00:00:00.000Z',
+        updatedAt: '2020-01-01T00:00:00.000Z',
+      }),
+    );
+
+    const profile = await getMyProfile(repository, 'user-1', 'user1@example.com');
+
+    expect(profile).toEqual({ plan: 'free' });
   });
 });

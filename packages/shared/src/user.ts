@@ -7,6 +7,10 @@ import { z } from 'zod';
 export const userStatusSchema = z.enum(['active', 'pendingDeletion']);
 export type UserStatus = z.infer<typeof userStatusSchema>;
 
+/** free: 過去3か月分のみ参照・登録・更新可。paid: 全期間可。プラン定義は plan.ts 参照。 */
+export const userPlanSchema = z.enum(['free', 'paid']);
+export type UserPlan = z.infer<typeof userPlanSchema>;
+
 export const userSchema = z.object({
   id: z.string(),
   email: z.string().email(),
@@ -16,7 +20,16 @@ export const userSchema = z.object({
   /** 利用規約・プライバシーポリシー（結合バージョン）に同意済みのバージョン */
   termsAgreedVersion: z.string().optional(),
   termsAgreedAt: z.string().datetime().optional(),
+  /** 未設定の既存レコードは free 扱い（userService.ts の読み込み側で補完） */
+  plan: userPlanSchema,
+  planUpdatedAt: z.string().datetime().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
 export type User = z.infer<typeof userSchema>;
+
+/** GET /users/me レスポンス。フロントのプラン判定用に必要最小限のフィールドのみ返す。 */
+export const userProfileResponseSchema = z.object({
+  plan: userPlanSchema,
+});
+export type UserProfileResponse = z.infer<typeof userProfileResponseSchema>;
