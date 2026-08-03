@@ -100,7 +100,7 @@
     "@aws-cdk/customresources:installLatestAwsSdkDefault": false,
     "@aws-cdk/s3-notifications:addS3TrustKeyPolicyForSnsSubscriptions": true,
     "stage": "prod",
-    "alertEmail": "",
+    "alertEmail": "ryo-uchiyama@minatoproject.com",
     "amplifyGithubRepoUrl": "https://github.com/step63r/household-account-book",
     "frontendBaseUrl": "https://household.minatoproject.com"
   }

@@ -28,7 +28,7 @@
 
 ### インフラ
 - IaC: AWS CDK (TypeScript)。フロント（Amplify Hostingのapp設定）とバックエンドを1つのCDKアプリで管理
-- CI/CD: GitHub Actions（`cdk deploy` 実行）+ Amplify Hostingの自動ビルド・デプロイ
+- CI/CD: GitHub Actions（lint/typecheck/test/build/`cdk synth`）+ Amplify Hostingの自動ビルド・デプロイ。`cdk deploy`はCIに組み込まず、手動実行＋ユーザー確認のフローとする（詳細は実装状況セクション参照）
 - 環境: prodのみ（個人利用のため。2026-07-24にdev/2環境構成からprod単一環境に切替済み。詳細は「実装状況」参照）
 
 ## ドメインモデル
