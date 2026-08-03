@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import { ApiStack } from '../lib/api-stack';
 import { AuthStack } from '../lib/auth-stack';
+import { BatchStack } from '../lib/batch-stack';
 import { DataStack } from '../lib/data-stack';
 import { HostingStack } from '../lib/hosting-stack';
 import { MonitoringStack } from '../lib/monitoring-stack';
@@ -32,6 +33,12 @@ const authStack = new AuthStack(app, `${stackNamePrefix}-Auth`, { stage, env, fr
 
 const dataStack = new DataStack(app, `${stackNamePrefix}-Data`, { stage, env });
 
+const batchStack = new BatchStack(app, `${stackNamePrefix}-Batch`, {
+  stage,
+  env,
+  table: dataStack.table,
+});
+
 const apiStack = new ApiStack(app, `${stackNamePrefix}-Api`, {
   stage,
   env,
@@ -52,7 +59,7 @@ new HostingStack(app, `${stackNamePrefix}-Hosting`, {
 new MonitoringStack(app, `${stackNamePrefix}-Monitoring`, {
   stage,
   env,
-  functions: apiStack.functions,
+  functions: { ...apiStack.functions, ...batchStack.functions },
   table: dataStack.table,
   alertEmail,
 });

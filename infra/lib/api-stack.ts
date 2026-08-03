@@ -37,7 +37,8 @@ const HANDLERS_DIR = path.join(__dirname, '..', '..', 'apps', 'backend', 'src', 
  *
  * Note: this only covers synchronous request handlers behind the HTTP API. The 30-day
  * physical-deletion batch for withdrawn accounts (CLAUDE.md's 退会 policy) is a separate
- * scheduled Lambda + EventBridge rule, not implemented yet - out of scope for this route table.
+ * scheduled Lambda + EventBridge rule, implemented in infra/lib/batch-stack.ts (BatchStack) -
+ * out of scope for this route table.
  */
 const ROUTES: RouteDef[] = [
   // Categories - apps/backend/src/{handlers,services}/*Category*.ts

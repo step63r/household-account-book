@@ -59,7 +59,7 @@ household-account-book/
 │   └── backend/         # Lambda関数群（TypeScript, apps/backend/src/handlers/<name>.ts）
 ├── packages/
 │   └── shared/          # フロント/バック共有の型定義・Zodスキーマ（ビルド不要、TSソースを直接参照）
-├── infra/                # AWS CDK (TypeScript)。infra/lib/{auth,data,api,hosting,monitoring}-stack.ts
+├── infra/                # AWS CDK (TypeScript)。infra/lib/{auth,data,batch,api,hosting,monitoring}-stack.ts
 └── .github/workflows/    # CI
 ```
 
@@ -77,8 +77,7 @@ pnpmワークスペース（`pnpm-workspace.yaml`）。ルート`package.json`�
 
 ## 実装状況
 
-- バックエンド: 費目（カテゴリ）・取引・予算・集計（推移/費目別ピボット/予実差）のCRUD・集計エンドポイントを実装済み（DynamoDB連携・監査ログ込み、`pnpm --filter @household/backend test`で全ユニットテスト green）。退会（`POST /users/me/withdraw`）も論理削除（`status: pendingDeletion`への遷移、`deletionScheduledAt`記録）まで実装済み
-  - 未着手の既知ギャップ: 退会の**物理削除バッチ**（`deletionScheduledAt`経過後にDynamoDB項目を実削除するEventBridge + Lambdaのスケジュール実行）は未実装。着手時に追加すること
+- バックエンド: 費目（カテゴリ）・取引・予算・集計（推移/費目別ピボット/予実差）のCRUD・集計エンドポイントを実装済み（DynamoDB連携・監査ログ込み、`pnpm --filter @household/backend test`で全ユニットテスト green）。退会（`POST /users/me/withdraw`）は論理削除（`status: pendingDeletion`への遷移、`deletionScheduledAt`記録、`userService.ts`の`requestWithdrawal`）に加え、猶予期間経過後の**物理削除バッチ**も実装済み（2026-08-03）。`apps/backend/src/handlers/deleteWithdrawnUsers.ts`（`ScheduledHandler`、EventBridge Ruleから1日1回起動）が`withdrawalBatchService.ts`の`runWithdrawalDeletionBatch`を呼び、`userDeletionRepository.ts`の`DynamoUserDeletionRepository`で①Scan+FilterExpressionで猶予期間切れの`pendingDeletion`ユーザーを検索（テーブル本来の「Query常時・Scanなし」方針への意図的な例外。GSIなしでstatus×日付条件を表現できないため、個人・家族向け規模の1日1回バッチに限定して許容）②該当ユーザーのPK配下の全アイテム（PROFILE/TXN/CATEGORY/BUDGET）をQuery→25件チャンクでBatchWriteItem削除、を行う。1ユーザーの削除失敗は他ユーザーの処理を止めず、バッチ全体で失敗があれば最後にthrowして既存のLambdaエラーアラームに乗せる設計
   - パスワードリセット（`apps/backend/src/handlers/customMessage.ts`）実装済み。Cognitoの`CustomMessage`トリガーとして、`triggerSource === 'CustomMessage_ForgotPassword'`のときのみメール本文を差し替え、確認コードを`${FRONTEND_BASE_URL}/reset-password?email=...&code=...`のリンクに埋め込む。他のtriggerSource（サインアップ確認等）はデフォルトテンプレートのまま。他の認証系機能と同様バックエンドAPIは経由せず、フロントは`ConfirmForgotPassword`をCognitoに直接呼ぶ
 - フロントエンド:
   - 費目・取引・予算・退会はすべて実バックエンドAPIに配線済み（`src/lib/categories.ts` / `transactions.ts` / `budgets.ts` / `account.ts`、いずれも`apiFetch`経由）。localStorageモック（`local-store.ts`）は削除済み
@@ -94,6 +93,7 @@ pnpmワークスペース（`pnpm-workspace.yaml`）。ルート`package.json`�
   - 追加env: `VITE_COGNITO_USER_POOL_ID` / `VITE_COGNITO_CLIENT_ID` / `VITE_API_BASE_URL`（`Household-prod-Auth`/`Household-prod-Api`スタックの出力値。`apps/frontend/.env`に設定済み、gitignore対象）
   - prod環境の実APIに対して`GET /categories`が認証なしで401を返すことを確認済み（疎通そのものはOK）。実際のサインアップ〜ログイン〜画面操作のブラウザでの動作確認はまだ行っていない
 - インフラ: 5スタック（Auth/Data/Api/Hosting/Monitoring）を`Household-prod-*`としてリージョン`ap-northeast-1`・アカウント`966191971257`にdeploy済み（2026-07-24。当初dev環境として作ったものを、個人利用でdev/prodを分ける必要が無いと判断しprod単一構成に切替。`Household-dev-*`一式は動作確認後に完全削除済み）。API Gatewayエンドポイントは`Household-prod-Api`スタックの`ApiEndpoint`出力を参照
+  - 退会物理削除バッチ用に`infra/lib/batch-stack.ts`（`BatchStack`）を追加済み（2026-08-03）。`deleteWithdrawnUsers` Lambda（Scan/Query/BatchWriteItemのみ最小権限付与）とEventBridge Rule（`aws-events`/`aws-events-targets`、毎日UTC 18:10=JST 3:10のcron）を定義し、`bin/app.ts`で`DataStack`の後・`ApiStack`の前に配置。`MonitoringStack`への`functions`は`{...apiStack.functions, ...batchStack.functions}`にマージ済みでエラーアラームも自動付与される。`cdk deploy Household-prod-Batch Household-prod-Monitoring -c stage=prod`でdeploy済み（2026-08-03）。`Household-prod-Batch`新規作成、`Household-prod-Monitoring`にエラーアラーム追加、Auth/Data/Apiは依存関係でデプロイ対象に含まれたが実変更なし（no changes）。以後、猶予期間経過後の退会ユーザーは毎日JST 3:10に自動で物理削除される
   - stageを切り替える場合、CloudFormationスタック名自体に`stage`が埋め込まれる設計（`household-${stage}-*`）のためリネームはできず、新環境を丸ごとdeploy→動作確認→旧環境をdestroyという流れになる（`cdk destroy -c stage=<旧stage>`のように、cdk.json変更後は明示的に`-c stage=...`で上書きしないと旧stageのスタックをCDKアプリが見失う点に注意 — 実際にこれではまった）
   - Amplify HostingはGitHub連携済み。ブランチ名は`master`（このリポジトリの実際のデフォルトブランチ。`infra/lib/hosting-stack.ts`のCDK addBranchは元`main`とハードコードされておりビルド失敗の原因になっていたため修正済み）
   - GitHub接続はAWS推奨のGitHub App方式（Amplifyコンソールから移行済み、2026-07-24）。当初はPAT + Secrets Manager + `GitHubSourceCodeProvider`（`OauthToken`）で接続していたが、AWSがPAT/OAuthトークン方式を廃止しGitHub App方式への移行を促しているため切替。`infra/lib/hosting-stack.ts`のCDKコードはもう`OauthToken`/`AccessToken`を宣言せず、`Repository`のみをL1 (`CfnApp`) escape hatchで設定している（`amplify.GitHubSourceCodeProvider`はPAT前提でGitHub App接続を表現できないため使用不可。CloudFormationの`UpdateApp`は認証系プロパティを省略すると既存の接続を維持する挙動を利用）。PAT用シークレット（`household-dev-amplify-github-token`）は削除済み（2026-07-25、30日間の復旧期間あり）。GitHub側のPAT自体の失効はユーザー側で対応が必要
