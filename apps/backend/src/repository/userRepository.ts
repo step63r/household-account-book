@@ -36,8 +36,6 @@ export class DynamoUserRepository implements UserRepository {
   }
 
   async put(user: User): Promise<void> {
-    await ddbDocClient.send(
-      new PutCommand({ TableName: getTableName(), Item: toItem(user) }),
-    );
+    await ddbDocClient.send(new PutCommand({ TableName: getTableName(), Item: toItem(user) }));
   }
 }

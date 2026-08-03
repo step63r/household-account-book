@@ -6,9 +6,7 @@ import { handler as customMessageHandler } from './customMessage';
  * Cognito CustomMessage trigger events aren't invoked through API Gateway, so unlike the
  * HTTP handlers this fixture models the raw event shape Cognito sends the Lambda directly.
  */
-function buildEvent(
-  overrides: Partial<CustomMessageTriggerEvent> = {},
-): CustomMessageTriggerEvent {
+function buildEvent(overrides: Partial<CustomMessageTriggerEvent> = {}): CustomMessageTriggerEvent {
   return {
     version: '1',
     region: 'ap-northeast-1',

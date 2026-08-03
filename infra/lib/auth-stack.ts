@@ -82,7 +82,16 @@ export class AuthStack extends cdk.Stack {
     // reset-password link (${FRONTEND_BASE_URL}/reset-password?email=...&code=...) instead of
     // Cognito's default plain-code email. See apps/backend/src/handlers/customMessage.ts.
     const customMessageFn = new NodejsFunction(this, 'customMessageFn', {
-      entry: path.join(__dirname, '..', '..', 'apps', 'backend', 'src', 'handlers', 'customMessage.ts'),
+      entry: path.join(
+        __dirname,
+        '..',
+        '..',
+        'apps',
+        'backend',
+        'src',
+        'handlers',
+        'customMessage.ts',
+      ),
       handler: 'handler',
       runtime: lambda.Runtime.NODEJS_22_X,
       architecture: lambda.Architecture.ARM_64,

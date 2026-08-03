@@ -41,11 +41,16 @@ import { EMPTY_ARRAY } from '@/lib/utils';
 
 export default function CategoriesPage() {
   const queryClient = useQueryClient();
-  const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: async () => getCategories() });
+  const categoriesQuery = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => getCategories(),
+  });
   const categories = categoriesQuery.data ?? EMPTY_ARRAY;
 
   const grouped = useMemo(() => {
-    const fixed = categories.filter((c) => c.type === 'fixed').sort((a, b) => a.sortOrder - b.sortOrder);
+    const fixed = categories
+      .filter((c) => c.type === 'fixed')
+      .sort((a, b) => a.sortOrder - b.sortOrder);
     const variable = categories
       .filter((c) => c.type === 'variable')
       .sort((a, b) => a.sortOrder - b.sortOrder);
@@ -167,7 +172,13 @@ function CategoryGroupCard({
                   )}
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button type="button" variant="ghost" size="icon" aria-label="編集" onClick={() => onEdit(c)}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="編集"
+                    onClick={() => onEdit(c)}
+                  >
                     <Pencil className="size-4" />
                   </Button>
                   <Button

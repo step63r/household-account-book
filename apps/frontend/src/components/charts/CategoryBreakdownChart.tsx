@@ -35,7 +35,10 @@ function buildBreakdown(
   const top = withAmount.slice(0, TOP_N);
   const otherAmount = withAmount.slice(TOP_N).reduce((sum, row) => sum + row.amount, 0);
   return {
-    rows: [...top, { categoryId: OTHER_CATEGORY_ID, categoryName: OTHER_LABEL, amount: otherAmount }],
+    rows: [
+      ...top,
+      { categoryId: OTHER_CATEGORY_ID, categoryName: OTHER_LABEL, amount: otherAmount },
+    ],
     total,
   };
 }
@@ -52,7 +55,11 @@ export function CategoryBreakdownChart({
 }) {
   if (isLoading) {
     return (
-      <ul className="flex flex-col gap-4" aria-label="費目別支出の内訳を読み込み中" aria-busy="true">
+      <ul
+        className="flex flex-col gap-4"
+        aria-label="費目別支出の内訳を読み込み中"
+        aria-busy="true"
+      >
         {[0, 1, 2, 3].map((i) => (
           <li key={i} className="flex flex-col gap-1.5">
             <div className="flex items-baseline justify-between gap-2">

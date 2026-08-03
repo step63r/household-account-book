@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { BudgetVarianceRow, CategoryPivotRow, TrendGranularity, TrendPoint } from '@household/shared';
+import type {
+  BudgetVarianceRow,
+  CategoryPivotRow,
+  TrendGranularity,
+  TrendPoint,
+} from '@household/shared';
 import { resolvePlanFloorDateString } from '@household/shared';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -66,7 +71,8 @@ export default function DashboardPage() {
   // 無料プランは直近3ヶ月のみ参照可能（有料プランやプラン未確定時はundefined=無制限）。
   const profileQuery = useUserProfile();
   const plan = profileQuery.data?.plan;
-  const planFloorDate = plan === 'free' ? resolvePlanFloorDateString('free', new Date()) : undefined;
+  const planFloorDate =
+    plan === 'free' ? resolvePlanFloorDateString('free', new Date()) : undefined;
 
   const trendRange = trendRangeFor(granularity, selectedYearMonth, planFloorDate);
   const trendQuery = useQuery({
@@ -77,7 +83,8 @@ export default function DashboardPage() {
   const kpiRangeTo = monthDateRange(yearMonth).to;
   const kpiTrendQuery = useQuery({
     queryKey: ['aggregation', 'trend', 'month', previousMonth, kpiRangeTo],
-    queryFn: async () => getTrend({ granularity: 'month', from: `${previousMonth}-01`, to: kpiRangeTo }),
+    queryFn: async () =>
+      getTrend({ granularity: 'month', from: `${previousMonth}-01`, to: kpiRangeTo }),
   });
 
   const categoryPivotQuery = useQuery({
@@ -211,7 +218,9 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>資産形成推移</CardTitle>
-            <CardDescription>積立・投資・保険・NISA拠出などの振替のみを集計（収支には含みません）</CardDescription>
+            <CardDescription>
+              積立・投資・保険・NISA拠出などの振替のみを集計（収支には含みません）
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <AssetFormationChart data={assetFormationData} isLoading={isInitialLoading} />

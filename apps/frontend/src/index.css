@@ -99,8 +99,7 @@
   --color-income: var(--income);
   --color-expense: var(--expense);
   --color-transfer: var(--transfer);
-  --font-sans:
-    'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Yu Gothic UI', system-ui, sans-serif;
+  --font-sans: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Yu Gothic UI', system-ui, sans-serif;
 }
 
 @layer base {

@@ -60,11 +60,23 @@ describe('listBudgets', () => {
     await expect(listBudgets(repository, 'user-1', undefined)).rejects.toThrow(ZodError);
   });
 
-  it('returns only the caller\'s budgets for the requested month', async () => {
+  it("returns only the caller's budgets for the requested month", async () => {
     const repository = new FakeBudgetRepository();
-    await upsertBudget(repository, 'user-1', { yearMonth: '2026-07', categoryId: 'c1', amount: 1000 });
-    await upsertBudget(repository, 'user-1', { yearMonth: '2026-08', categoryId: 'c1', amount: 2000 });
-    await upsertBudget(repository, 'user-2', { yearMonth: '2026-07', categoryId: 'c1', amount: 3000 });
+    await upsertBudget(repository, 'user-1', {
+      yearMonth: '2026-07',
+      categoryId: 'c1',
+      amount: 1000,
+    });
+    await upsertBudget(repository, 'user-1', {
+      yearMonth: '2026-08',
+      categoryId: 'c1',
+      amount: 2000,
+    });
+    await upsertBudget(repository, 'user-2', {
+      yearMonth: '2026-07',
+      categoryId: 'c1',
+      amount: 3000,
+    });
 
     const julyBudgets = await listBudgets(repository, 'user-1', '2026-07');
 

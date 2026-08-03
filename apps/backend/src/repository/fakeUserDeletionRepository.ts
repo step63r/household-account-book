@@ -36,9 +36,7 @@ export class FakeUserDeletionRepository implements UserDeletionRepository {
     return this.itemsByUserId.get(userId)?.length ?? 0;
   }
 
-  async findCandidates(
-    nowIso: string,
-  ): Promise<{ userId: string; deletionScheduledAt: string }[]> {
+  async findCandidates(nowIso: string): Promise<{ userId: string; deletionScheduledAt: string }[]> {
     return this.candidates.filter((candidate) => candidate.deletionScheduledAt <= nowIso);
   }
 

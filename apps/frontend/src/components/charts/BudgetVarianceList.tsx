@@ -44,7 +44,11 @@ export function BudgetVarianceList({
       {rows.map((row) => {
         const isOverBudget = row.varianceAmount > 0;
         const ratio =
-          row.budgetAmount > 0 ? Math.min(row.actualAmount / row.budgetAmount, 1.5) : row.actualAmount > 0 ? 1.5 : 0;
+          row.budgetAmount > 0
+            ? Math.min(row.actualAmount / row.budgetAmount, 1.5)
+            : row.actualAmount > 0
+              ? 1.5
+              : 0;
         const widthPercent = Math.min(ratio * 100, 100);
 
         return (
@@ -73,9 +77,17 @@ export function BudgetVarianceList({
             </div>
             <div className="flex items-center gap-1 text-xs">
               {isOverBudget ? (
-                <TrendingUp className="size-3.5" style={{ color: 'var(--status-critical)' }} aria-hidden="true" />
+                <TrendingUp
+                  className="size-3.5"
+                  style={{ color: 'var(--status-critical)' }}
+                  aria-hidden="true"
+                />
               ) : (
-                <TrendingDown className="size-3.5" style={{ color: 'var(--status-good)' }} aria-hidden="true" />
+                <TrendingDown
+                  className="size-3.5"
+                  style={{ color: 'var(--status-good)' }}
+                  aria-hidden="true"
+                />
               )}
               <span
                 className="font-medium tabular-nums"

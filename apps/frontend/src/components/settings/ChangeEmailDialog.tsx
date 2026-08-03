@@ -13,7 +13,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import { confirmEmailChange, requestEmailChange } from '@/lib/auth';
 import {
   changeEmailSchema,
@@ -138,7 +145,12 @@ export function ChangeEmailDialog({
                   <FormItem>
                     <FormLabel>確認コード</FormLabel>
                     <FormControl>
-                      <Input inputMode="numeric" autoComplete="one-time-code" placeholder="123456" {...field} />
+                      <Input
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        placeholder="123456"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

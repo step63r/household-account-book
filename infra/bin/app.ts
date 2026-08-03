@@ -17,7 +17,8 @@ if (stageContext !== undefined && stageContext !== 'dev' && stageContext !== 'pr
 // Not read from an env var: CDK context is the deliberate, explicit way to pick a stage
 // (`cdk deploy -c stage=prod ...`) so nobody accidentally deploys to prod via a stale shell env.
 const alertEmail: string | undefined = app.node.tryGetContext('alertEmail') || undefined;
-const amplifyGithubRepoUrl: string | undefined = app.node.tryGetContext('amplifyGithubRepoUrl') || undefined;
+const amplifyGithubRepoUrl: string | undefined =
+  app.node.tryGetContext('amplifyGithubRepoUrl') || undefined;
 const frontendBaseUrl: string | undefined = app.node.tryGetContext('frontendBaseUrl') || undefined;
 
 // Same account/region for every stack in a stage; account/region are only known at synth/deploy

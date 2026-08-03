@@ -83,7 +83,10 @@ function describeCognitoError(error: unknown, fallback: string): string {
 }
 
 /** Cognito `signUp`。デフォルトでメール確認コードの入力が必須のため、成功後は `confirmSignUp` を呼ぶ想定。 */
-export async function signUpWithEmailPassword({ email, password }: EmailPasswordCredentials): Promise<void> {
+export async function signUpWithEmailPassword({
+  email,
+  password,
+}: EmailPasswordCredentials): Promise<void> {
   const pool = getUserPool();
   const attributeList = [new CognitoUserAttribute({ Name: 'email', Value: email })];
 
@@ -114,7 +117,10 @@ export async function confirmSignUp({ email, code }: ConfirmSignUpInput): Promis
 }
 
 /** Cognito `authenticateUser`（SRP 認証）。成功すると SDK がセッションを永続化し、`getAuthToken` から参照できるようになる。 */
-export async function signInWithEmailPassword({ email, password }: EmailPasswordCredentials): Promise<void> {
+export async function signInWithEmailPassword({
+  email,
+  password,
+}: EmailPasswordCredentials): Promise<void> {
   const user = getCognitoUser(email);
   const authenticationDetails = new AuthenticationDetails({ Username: email, Password: password });
 
@@ -140,7 +146,8 @@ export async function forgotPassword(email: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     user.forgotPassword({
       onSuccess: () => resolve(),
-      onFailure: (err) => reject(new Error(describeCognitoError(err, 'パスワード再設定の受付に失敗しました'))),
+      onFailure: (err) =>
+        reject(new Error(describeCognitoError(err, 'パスワード再設定の受付に失敗しました'))),
     });
   });
 }
@@ -162,7 +169,8 @@ export async function confirmForgotPassword({
   await new Promise<void>((resolve, reject) => {
     user.confirmPassword(code, newPassword, {
       onSuccess: () => resolve(),
-      onFailure: (err) => reject(new Error(describeCognitoError(err, 'パスワードの再設定に失敗しました'))),
+      onFailure: (err) =>
+        reject(new Error(describeCognitoError(err, 'パスワードの再設定に失敗しました'))),
     });
   });
 }
@@ -245,7 +253,8 @@ export async function confirmEmailChange(code: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     authenticated.user.verifyAttribute('email', code, {
       onSuccess: () => resolve(),
-      onFailure: (err) => reject(new Error(describeCognitoError(err, '確認コードの検証に失敗しました'))),
+      onFailure: (err) =>
+        reject(new Error(describeCognitoError(err, '確認コードの検証に失敗しました'))),
     });
   });
 }

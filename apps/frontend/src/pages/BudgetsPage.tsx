@@ -9,7 +9,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { AmountInput } from '@/components/ui/amount-input';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import {
   Dialog,
   DialogContent,
@@ -28,7 +35,9 @@ import { formatYen } from '@/lib/format';
 /** 日本時間の当月（YYYY-MM）。toISOString()はUTC基準になるため使わない
  * （月初〜朝9時のUTC日付が前月にずれる）。 */
 function currentYearMonth(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date()).slice(0, 7);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' })
+    .format(new Date())
+    .slice(0, 7);
 }
 
 function previousYearMonth(yearMonth: string): string {
@@ -43,7 +52,10 @@ export default function BudgetsPage() {
   const [yearMonth, setYearMonth] = useState(currentYearMonth());
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
 
-  const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: async () => getCategories() });
+  const categoriesQuery = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => getCategories(),
+  });
   const budgetsQuery = useQuery({
     queryKey: ['budgets', yearMonth],
     queryFn: async () => getBudgets(yearMonth),
@@ -64,7 +76,10 @@ export default function BudgetsPage() {
   const form = useForm<Record<string, number>>({
     resolver: zodResolver(formSchema),
     values: Object.fromEntries(
-      categories.map((c) => [c.id, budgetsForMonth.find((b) => b.categoryId === c.id)?.amount ?? 0]),
+      categories.map((c) => [
+        c.id,
+        budgetsForMonth.find((b) => b.categoryId === c.id)?.amount ?? 0,
+      ]),
     ),
   });
 
@@ -134,7 +149,9 @@ export default function BudgetsPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={categories.length === 0 || saveMutation.isPending || copyMutation.isPending}
+                  disabled={
+                    categories.length === 0 || saveMutation.isPending || copyMutation.isPending
+                  }
                 >
                   前月をコピー
                 </Button>
@@ -143,8 +160,10 @@ export default function BudgetsPage() {
                 <DialogHeader>
                   <DialogTitle>前月の予算をコピーしますか？</DialogTitle>
                   <DialogDescription>
-                    {formatYearMonth(previousYearMonth(yearMonth))} の予算を {formatYearMonth(yearMonth)} にコピーして保存します。
-                    現在保存されている {formatYearMonth(yearMonth)} の予算（未保存の変更があれば破棄されます）は上書きされます。
+                    {formatYearMonth(previousYearMonth(yearMonth))} の予算を{' '}
+                    {formatYearMonth(yearMonth)} にコピーして保存します。 現在保存されている{' '}
+                    {formatYearMonth(yearMonth)}{' '}
+                    の予算（未保存の変更があれば破棄されます）は上書きされます。
                   </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
@@ -174,7 +193,11 @@ export default function BudgetsPage() {
 
           <BudgetTotalRow label="固定費の合計" amount={fixedTotalAmount} />
 
-          <BudgetCategoryGroup title="変動費" categories={variableCategories} control={form.control} />
+          <BudgetCategoryGroup
+            title="変動費"
+            categories={variableCategories}
+            control={form.control}
+          />
 
           <BudgetTotalRow label="変動費の合計" amount={variableTotalAmount} />
 

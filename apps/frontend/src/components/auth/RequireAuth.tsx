@@ -24,9 +24,9 @@ import { getConsentStatus } from '@/lib/consent';
  */
 export function RequireAuth() {
   const location = useLocation();
-  const [sessionStatus, setSessionStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>(
-    'checking',
-  );
+  const [sessionStatus, setSessionStatus] = useState<
+    'checking' | 'authenticated' | 'unauthenticated'
+  >('checking');
 
   useEffect(() => {
     let cancelled = false;
@@ -50,7 +50,10 @@ export function RequireAuth() {
     refetchOnWindowFocus: false,
   });
 
-  if (sessionStatus === 'checking' || (sessionStatus === 'authenticated' && consentQuery.isLoading)) {
+  if (
+    sessionStatus === 'checking' ||
+    (sessionStatus === 'authenticated' && consentQuery.isLoading)
+  ) {
     return (
       <div className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">
         読み込み中...

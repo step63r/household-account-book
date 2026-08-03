@@ -89,7 +89,9 @@ export class HostingStack extends cdk.Stack {
       // Only add a deployable branch once there's an actual repo connected - an auto-created
       // branch with no repository can't build anything. Branch name is "master", not the more
       // common "main" - that's this repo's actual default branch (git remote has no "main").
-      this.app.addBranch('master', { stage: props.stage === 'prod' ? 'PRODUCTION' : 'DEVELOPMENT' });
+      this.app.addBranch('master', {
+        stage: props.stage === 'prod' ? 'PRODUCTION' : 'DEVELOPMENT',
+      });
     }
   }
 }

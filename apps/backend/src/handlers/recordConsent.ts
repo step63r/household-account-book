@@ -18,7 +18,12 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
     const userId = requireUserId(event);
     const email = requireEmail(event);
     const status = await recordConsent(repository, userId, email);
-    logAudit({ userId, action: 'user.consent', targetId: userId, details: { version: status.termsAgreedVersion } });
+    logAudit({
+      userId,
+      action: 'user.consent',
+      targetId: userId,
+      details: { version: status.termsAgreedVersion },
+    });
     return jsonResponse(200, status);
   } catch (error) {
     return handleError(error);

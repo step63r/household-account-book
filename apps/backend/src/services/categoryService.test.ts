@@ -2,12 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { PRESET_CATEGORIES } from '@household/shared';
 import { ZodError } from 'zod';
 import { FakeCategoryRepository } from '../repository/fakeCategoryRepository';
-import {
-  createCategory,
-  deleteCategory,
-  listCategories,
-  updateCategory,
-} from './categoryService';
+import { createCategory, deleteCategory, listCategories, updateCategory } from './categoryService';
 import { NotFoundError } from '../lib/errors';
 
 describe('listCategories', () => {
@@ -23,9 +18,7 @@ describe('listCategories', () => {
       PRESET_CATEGORIES.map((preset) => preset.name),
     );
     // Persisted, not just returned in-memory.
-    await expect(repository.listByUser('user-1')).resolves.toHaveLength(
-      PRESET_CATEGORIES.length,
-    );
+    await expect(repository.listByUser('user-1')).resolves.toHaveLength(PRESET_CATEGORIES.length);
   });
 
   it('does not reseed presets on a second call', async () => {
@@ -55,9 +48,7 @@ describe('createCategory', () => {
   it('rejects invalid input', async () => {
     const repository = new FakeCategoryRepository();
 
-    await expect(createCategory(repository, 'user-1', { type: 'fixed' })).rejects.toThrow(
-      ZodError,
-    );
+    await expect(createCategory(repository, 'user-1', { type: 'fixed' })).rejects.toThrow(ZodError);
     await expect(repository.listByUser('user-1')).resolves.toEqual([]);
   });
 
@@ -126,9 +117,7 @@ describe('deleteCategory', () => {
   it('throws NotFoundError for an unknown category', async () => {
     const repository = new FakeCategoryRepository();
 
-    await expect(deleteCategory(repository, 'user-1', 'missing-id')).rejects.toThrow(
-      NotFoundError,
-    );
+    await expect(deleteCategory(repository, 'user-1', 'missing-id')).rejects.toThrow(NotFoundError);
   });
 
   it('deletes an existing category, including preset-origin ones', async () => {

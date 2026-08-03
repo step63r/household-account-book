@@ -110,7 +110,9 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium">メールアドレス</p>
-              <p className="text-sm text-muted-foreground">ログインに使用するメールアドレスを変更します</p>
+              <p className="text-sm text-muted-foreground">
+                ログインに使用するメールアドレスを変更します
+              </p>
             </div>
             <ChangeEmailDialog onEmailChanged={setEmail} onSuccess={handleSuccess} />
           </div>

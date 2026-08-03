@@ -103,7 +103,7 @@ describe('createTransaction', () => {
 });
 
 describe('listTransactions', () => {
-  it('returns only the caller\'s own transactions', async () => {
+  it("returns only the caller's own transactions", async () => {
     const repository = new FakeTransactionRepository();
     await createTransaction(repository, 'user-1', validExpense);
     await createTransaction(repository, 'user-2', validExpense);
@@ -235,7 +235,12 @@ describe('plan-based access window', () => {
       const repository = new FakeTransactionRepository();
 
       await expect(
-        createTransaction(repository, 'user-1', { ...validExpense, date: dateOutsideWindow }, 'free'),
+        createTransaction(
+          repository,
+          'user-1',
+          { ...validExpense, date: dateOutsideWindow },
+          'free',
+        ),
       ).rejects.toThrow(HttpError);
     });
 
@@ -269,19 +274,44 @@ describe('plan-based access window', () => {
   describe('listTransactions', () => {
     it('clamps `from` up to the free-plan floor date instead of erroring', async () => {
       const repository = new FakeTransactionRepository();
-      await createTransaction(repository, 'user-1', { ...validExpense, date: dateOutsideWindow }, 'paid');
-      await createTransaction(repository, 'user-1', { ...validExpense, date: dateWithinWindow }, 'paid');
+      await createTransaction(
+        repository,
+        'user-1',
+        { ...validExpense, date: dateOutsideWindow },
+        'paid',
+      );
+      await createTransaction(
+        repository,
+        'user-1',
+        { ...validExpense, date: dateWithinWindow },
+        'paid',
+      );
 
-      const transactions = await listTransactions(repository, 'user-1', { from: dateFarInThePast }, 'free');
+      const transactions = await listTransactions(
+        repository,
+        'user-1',
+        { from: dateFarInThePast },
+        'free',
+      );
 
       expect(transactions.map((t) => t.date)).toEqual([dateWithinWindow]);
     });
 
     it('leaves `from` untouched for a paid plan', async () => {
       const repository = new FakeTransactionRepository();
-      await createTransaction(repository, 'user-1', { ...validExpense, date: dateOutsideWindow }, 'paid');
+      await createTransaction(
+        repository,
+        'user-1',
+        { ...validExpense, date: dateOutsideWindow },
+        'paid',
+      );
 
-      const transactions = await listTransactions(repository, 'user-1', { from: dateFarInThePast }, 'paid');
+      const transactions = await listTransactions(
+        repository,
+        'user-1',
+        { from: dateFarInThePast },
+        'paid',
+      );
 
       expect(transactions.map((t) => t.date)).toEqual([dateOutsideWindow]);
     });
@@ -312,7 +342,13 @@ describe('plan-based access window', () => {
       );
 
       await expect(
-        updateTransaction(repository, 'user-1', transaction.id, { date: dateOutsideWindow }, 'free'),
+        updateTransaction(
+          repository,
+          'user-1',
+          transaction.id,
+          { date: dateOutsideWindow },
+          'free',
+        ),
       ).rejects.toThrow(HttpError);
     });
 
@@ -325,7 +361,13 @@ describe('plan-based access window', () => {
         'paid',
       );
 
-      const updated = await updateTransaction(repository, 'user-1', transaction.id, { amount: 500 }, 'paid');
+      const updated = await updateTransaction(
+        repository,
+        'user-1',
+        transaction.id,
+        { amount: 500 },
+        'paid',
+      );
 
       expect(updated.amount).toBe(500);
     });

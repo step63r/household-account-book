@@ -18,7 +18,11 @@ interface BudgetItem extends Budget {
 }
 
 function toItem(budget: Budget): BudgetItem {
-  return { ...budget, PK: userPk(budget.userId), SK: budgetSk(budget.yearMonth, budget.categoryId) };
+  return {
+    ...budget,
+    PK: userPk(budget.userId),
+    SK: budgetSk(budget.yearMonth, budget.categoryId),
+  };
 }
 
 function fromItem(item: Record<string, unknown>): Budget {
@@ -42,8 +46,6 @@ export class DynamoBudgetRepository implements BudgetRepository {
   }
 
   async put(budget: Budget): Promise<void> {
-    await ddbDocClient.send(
-      new PutCommand({ TableName: getTableName(), Item: toItem(budget) }),
-    );
+    await ddbDocClient.send(new PutCommand({ TableName: getTableName(), Item: toItem(budget) }));
   }
 }

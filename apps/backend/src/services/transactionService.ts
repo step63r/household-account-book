@@ -6,7 +6,10 @@ import {
   type TransactionType,
   type UserPlan,
 } from '@household/shared';
-import type { TransactionListRange, TransactionRepository } from '../repository/transactionRepository';
+import type {
+  TransactionListRange,
+  TransactionRepository,
+} from '../repository/transactionRepository';
 import { HttpError, NotFoundError } from '../lib/errors';
 import { assertWithinPlanWindow, clampFromParam } from '../lib/planAccess';
 
@@ -36,7 +39,9 @@ export async function listTransactions(
   // just gets the last FREE_PLAN_HISTORY_MONTHS worth of results.
   const clampedRange: TransactionListRange = { ...range, from: clampFromParam(plan, range?.from) };
   const transactions = await repository.listByUser(userId, clampedRange);
-  return transactions.slice().sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  return transactions
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 }
 
 export async function createTransaction(

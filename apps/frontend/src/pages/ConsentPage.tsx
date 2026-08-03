@@ -32,7 +32,8 @@ export default function ConsentPage() {
   const [error, setError] = useState<string | null>(null);
 
   // RequireAuth からのリダイレクト時に元々のアクセス先を state.from に積んでいる（無ければダッシュボードへ）
-  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/dashboard';
+  const from =
+    (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/dashboard';
 
   const handleAgree = async () => {
     setError(null);

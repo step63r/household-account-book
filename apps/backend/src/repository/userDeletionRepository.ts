@@ -41,7 +41,8 @@ export class DynamoUserDeletionRepository implements UserDeletionRepository {
       const result = await ddbDocClient.send(
         new ScanCommand({
           TableName: tableName,
-          FilterExpression: 'SK = :profileSk AND #status = :pendingDeletion AND deletionScheduledAt <= :now',
+          FilterExpression:
+            'SK = :profileSk AND #status = :pendingDeletion AND deletionScheduledAt <= :now',
           ExpressionAttributeNames: { '#status': 'status' },
           ExpressionAttributeValues: {
             ':profileSk': PROFILE_SK,

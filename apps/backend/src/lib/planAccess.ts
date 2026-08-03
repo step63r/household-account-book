@@ -1,4 +1,8 @@
-import { FREE_PLAN_HISTORY_MONTHS, resolvePlanFloorDateString, type UserPlan } from '@household/shared';
+import {
+  FREE_PLAN_HISTORY_MONTHS,
+  resolvePlanFloorDateString,
+  type UserPlan,
+} from '@household/shared';
 import { HttpError } from './errors';
 
 /**
@@ -6,7 +10,11 @@ import { HttpError } from './errors';
  * transactionSchema's `date` format) falls outside the plan's accessible history window.
  * No-op for `paid` (unlimited) - only `free` plans have a floor date.
  */
-export function assertWithinPlanWindow(plan: UserPlan, targetDate: string, now: Date = new Date()): void {
+export function assertWithinPlanWindow(
+  plan: UserPlan,
+  targetDate: string,
+  now: Date = new Date(),
+): void {
   const floor = resolvePlanFloorDateString(plan, now);
   if (floor && targetDate < floor) {
     throw new HttpError(
@@ -22,7 +30,11 @@ export function assertWithinPlanWindow(plan: UserPlan, targetDate: string, now: 
  * requests silently narrow to the accessible window instead of erroring. Returns `from`
  * unchanged for `paid` (no floor) or when it's already within (or narrower than) the window.
  */
-export function clampFromParam(plan: UserPlan, from: string | undefined, now: Date = new Date()): string | undefined {
+export function clampFromParam(
+  plan: UserPlan,
+  from: string | undefined,
+  now: Date = new Date(),
+): string | undefined {
   const floor = resolvePlanFloorDateString(plan, now);
   if (!floor) return from;
   if (!from || from < floor) return floor;
@@ -33,7 +45,11 @@ export function clampFromParam(plan: UserPlan, from: string | undefined, now: Da
  * Same idea as {@link clampFromParam} but for `YYYY-MM` budget-variance requests: clamps
  * `yearMonth` up to the plan's floor month.
  */
-export function clampYearMonthParam(plan: UserPlan, yearMonth: string, now: Date = new Date()): string {
+export function clampYearMonthParam(
+  plan: UserPlan,
+  yearMonth: string,
+  now: Date = new Date(),
+): string {
   const floor = resolvePlanFloorDateString(plan, now);
   if (!floor) return yearMonth;
   const floorMonth = floor.slice(0, 7);

@@ -2,7 +2,11 @@
  * 取引 API クライアント。`apiFetch` 経由で `apps/backend` の `/transactions` に接続する
  * （`src/lib/categories.ts` と同じ薄いラッパーの形）。
  */
-import type { CreateTransactionInput, Transaction, UpdateTransactionInput } from '@household/shared';
+import type {
+  CreateTransactionInput,
+  Transaction,
+  UpdateTransactionInput,
+} from '@household/shared';
 
 import { apiFetch } from '@/lib/api';
 

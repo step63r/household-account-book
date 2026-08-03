@@ -6,7 +6,10 @@ describe('runWithdrawalDeletionBatch', () => {
   it('does nothing and returns empty arrays when there are no candidates', async () => {
     const repository = new FakeUserDeletionRepository();
 
-    const result = await runWithdrawalDeletionBatch(repository, new Date('2026-08-03T00:00:00.000Z'));
+    const result = await runWithdrawalDeletionBatch(
+      repository,
+      new Date('2026-08-03T00:00:00.000Z'),
+    );
 
     expect(result).toEqual({ processedUserIds: [], failedUserIds: [] });
   });
@@ -14,9 +17,17 @@ describe('runWithdrawalDeletionBatch', () => {
   it('deletes every item for a candidate whose grace period has elapsed', async () => {
     const repository = new FakeUserDeletionRepository();
     repository.addCandidate('user-1', '2026-07-01T00:00:00.000Z');
-    repository.seedItems('user-1', [{ SK: 'PROFILE' }, { SK: 'TXN#2026-01-01#txn-1' }, { SK: 'CATEGORY#food' }, { SK: 'BUDGET#202601#food' }]);
+    repository.seedItems('user-1', [
+      { SK: 'PROFILE' },
+      { SK: 'TXN#2026-01-01#txn-1' },
+      { SK: 'CATEGORY#food' },
+      { SK: 'BUDGET#202601#food' },
+    ]);
 
-    const result = await runWithdrawalDeletionBatch(repository, new Date('2026-08-03T00:00:00.000Z'));
+    const result = await runWithdrawalDeletionBatch(
+      repository,
+      new Date('2026-08-03T00:00:00.000Z'),
+    );
 
     expect(result).toEqual({ processedUserIds: ['user-1'], failedUserIds: [] });
     expect(repository.itemCountFor('user-1')).toBe(0);
@@ -30,7 +41,10 @@ describe('runWithdrawalDeletionBatch', () => {
     repository.addCandidate('user-future', '2099-01-01T00:00:00.000Z');
     repository.seedItems('user-future', [{ SK: 'PROFILE' }]);
 
-    const result = await runWithdrawalDeletionBatch(repository, new Date('2026-08-03T00:00:00.000Z'));
+    const result = await runWithdrawalDeletionBatch(
+      repository,
+      new Date('2026-08-03T00:00:00.000Z'),
+    );
 
     expect(result).toEqual({ processedUserIds: [], failedUserIds: [] });
     expect(repository.itemCountFor('user-future')).toBe(1);
@@ -43,7 +57,10 @@ describe('runWithdrawalDeletionBatch', () => {
     repository.addCandidate('user-good', '2026-07-15T00:00:00.000Z');
     repository.seedItems('user-good', [{ SK: 'PROFILE' }, { SK: 'TXN#2026-01-01#txn-1' }]);
 
-    const result = await runWithdrawalDeletionBatch(repository, new Date('2026-08-03T00:00:00.000Z'));
+    const result = await runWithdrawalDeletionBatch(
+      repository,
+      new Date('2026-08-03T00:00:00.000Z'),
+    );
 
     expect(result.processedUserIds).toEqual(['user-good']);
     expect(result.failedUserIds).toEqual(['user-bad']);

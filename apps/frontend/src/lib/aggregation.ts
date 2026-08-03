@@ -5,7 +5,12 @@
  * 日次/週次/月次/年次推移・費目別ピボット・予実差はいずれもLambda側でインメモリ集計され、
  * フロントは結果をそのまま描画する（CLAUDE.md の方針どおり）。
  */
-import type { BudgetVarianceRow, CategoryPivotRow, TrendGranularity, TrendPoint } from '@household/shared';
+import type {
+  BudgetVarianceRow,
+  CategoryPivotRow,
+  TrendGranularity,
+  TrendPoint,
+} from '@household/shared';
 
 import { apiFetch } from '@/lib/api';
 
@@ -36,7 +41,9 @@ export function getCategoryPivot(params: {
 /** GET /aggregation/budget-variance?yearMonth=YYYY-MM
  * 予実差（指定月・費目別、expenseのみ）。 */
 export function getBudgetVariance(yearMonth: string): Promise<BudgetVarianceRow[]> {
-  return apiFetch<BudgetVarianceRow[]>(`/aggregation/budget-variance?yearMonth=${encodeURIComponent(yearMonth)}`);
+  return apiFetch<BudgetVarianceRow[]>(
+    `/aggregation/budget-variance?yearMonth=${encodeURIComponent(yearMonth)}`,
+  );
 }
 
 /** GET /aggregation/memo-suggestions?from=YYYY-MM-DD&to=YYYY-MM-DD

@@ -7,10 +7,12 @@
 ## Claude Codeに対する依頼事項
 
 - ユーザーに対する最終応答は必ず日本語で行うこと
+- gitのcommitおよびpushはユーザが行うので、いかなる場合もClaude Codeは実行しないこと
 
 ## 技術スタック
 
 ### フロントエンド
+
 - React + TypeScript + Vite（SPA）
 - UI: Tailwind CSS + shadcn/ui
 - グラフ: Recharts（日/週/月/年推移、費目別ピボット、予実差、資産形成推移の累計）
@@ -19,6 +21,7 @@
 - ホスティング: AWS Amplify Hosting。カスタムドメイン `https://household.minatoproject.com`（SES送信ドメイン`minatoproject.com`のサブドメイン）を使用。ただしこのカスタムドメイン紐付け（Route 53 / ACM証明書 / Amplifyドメイン設定）は本リポジトリのCDK（`infra/lib/hosting-stack.ts`）では一切管理しておらず、リポジトリ外（Amplifyコンソール等）で設定済みのものを前提としている点に注意
 
 ### バックエンド
+
 - API Gateway (HTTP API) + AWS Lambda（Node.js 22.x / TypeScript）
 - 認証: Amazon Cognito User Pool（メール/パスワード認証。将来的に外部IdP連携・MFAを追加する前提でCognitoを選定しているため、その拡張を妨げない設計にする）
 - DB: Amazon DynamoDB（オンデマンドキャパシティ、シングルテーブル設計、Point-in-Time Recovery有効化）
@@ -27,6 +30,7 @@
   - 集計・ピボット（日次/週次/月次推移、費目別ピボット、予実差）はDBに任せず、対象期間のQuery結果をLambda側でインメモリ集計する方針
 
 ### インフラ
+
 - IaC: AWS CDK (TypeScript)。フロント（Amplify Hostingのapp設定）とバックエンドを1つのCDKアプリで管理
 - CI/CD: GitHub Actions（lint/typecheck/test/build/`cdk synth`）+ Amplify Hostingの自動ビルド・デプロイ。`cdk deploy`はCIに組み込まず、手動実行＋ユーザー確認のフローとする（詳細は実装状況セクション参照）
 - 環境: prodのみ（個人利用のため。2026-07-24にdev/2環境構成からprod単一環境に切替済み。詳細は「実装状況」参照）

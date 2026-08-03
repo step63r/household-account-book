@@ -88,7 +88,12 @@ const ROUTES: RouteDef[] = [
     handlerFile: 'updateTransaction',
     // Query+Delete cover the "date changed -> delete old key, put new key" path the handler's TODO describes.
     // GetItem = plan check (see above).
-    dynamoActions: ['dynamodb:Query', 'dynamodb:PutItem', 'dynamodb:DeleteItem', 'dynamodb:GetItem'],
+    dynamoActions: [
+      'dynamodb:Query',
+      'dynamodb:PutItem',
+      'dynamodb:DeleteItem',
+      'dynamodb:GetItem',
+    ],
   },
   {
     method: apigwv2.HttpMethod.DELETE,

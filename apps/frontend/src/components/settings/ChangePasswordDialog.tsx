@@ -13,7 +13,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import { changePassword } from '@/lib/auth';
 import { changePasswordSchema, type ChangePasswordFormValues } from '@/lib/auth-schema';
 
@@ -61,7 +68,9 @@ export function ChangePasswordDialog({ onSuccess }: { onSuccess: (message: strin
       <DialogContent>
         <DialogHeader>
           <DialogTitle>パスワード変更</DialogTitle>
-          <DialogDescription>現在のパスワードを確認のうえ、新しいパスワードに変更します。</DialogDescription>
+          <DialogDescription>
+            現在のパスワードを確認のうえ、新しいパスワードに変更します。
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={onSubmit} className="flex flex-col gap-4">

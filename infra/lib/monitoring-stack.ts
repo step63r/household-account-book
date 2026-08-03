@@ -55,7 +55,8 @@ export class MonitoringStack extends cdk.Stack {
 
     new cloudwatch.Alarm(this, 'TableThrottleAlarm', {
       alarmName: `household-${props.stage}-table-throttles`,
-      alarmDescription: 'DynamoDB table is throttling requests (on-demand capacity, so this signals a hot partition, not a capacity ceiling)',
+      alarmDescription:
+        'DynamoDB table is throttling requests (on-demand capacity, so this signals a hot partition, not a capacity ceiling)',
       metric: props.table.metricThrottledRequestsForOperations({
         operations: [
           dynamodb.Operation.GET_ITEM,

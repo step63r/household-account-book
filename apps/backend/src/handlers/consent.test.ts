@@ -86,7 +86,10 @@ describe('getConsentStatus handler', () => {
 describe('recordConsent handler', () => {
   it('returns 401 when the JWT sub claim is missing', async () => {
     const event = buildEvent({
-      requestContext: { ...buildEvent().requestContext, http: { ...buildEvent().requestContext.http, method: 'POST' } },
+      requestContext: {
+        ...buildEvent().requestContext,
+        http: { ...buildEvent().requestContext.http, method: 'POST' },
+      },
     });
 
     const result = await recordConsentHandler(event, {} as never, () => undefined);

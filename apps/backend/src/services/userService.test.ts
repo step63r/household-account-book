@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { CURRENT_TERMS_VERSION, type User } from '@household/shared';
 import { FakeUserRepository } from '../repository/fakeUserRepository';
-import { getConsentStatus, getMyProfile, getUserPlan, recordConsent, requestWithdrawal } from './userService';
+import {
+  getConsentStatus,
+  getMyProfile,
+  getUserPlan,
+  recordConsent,
+  requestWithdrawal,
+} from './userService';
 
 /** Simulates a PROFILE item written before the `plan` field existed (DynamoDB is schemaless,
  * so such legacy items are still readable at runtime even though `plan` is now required by

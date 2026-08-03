@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQuery, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+} from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   createTransactionInputSchema,
@@ -84,7 +89,9 @@ function today(): string {
 /** 日本時間の当月（YYYY-MM）。toISOString()はUTC基準になるため使わない
  * （月初〜朝9時のUTC日付が前月にずれる）。 */
 function currentYearMonth(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date()).slice(0, 7);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' })
+    .format(new Date())
+    .slice(0, 7);
 }
 
 /** 選択月（YYYY-MM）の初日・末日（YYYY-MM-DD）を返す。取引一覧の絞り込みに使う。 */
@@ -98,7 +105,9 @@ function monthDateRange(yearMonth: string): { from: string; to: string } {
 const CUSTOM_INCOME_SOURCE = '__custom__';
 
 function isCustomIncomeSource(incomeSource: string): boolean {
-  return incomeSource !== '' && !(INCOME_SOURCE_PRESETS as readonly string[]).includes(incomeSource);
+  return (
+    incomeSource !== '' && !(INCOME_SOURCE_PRESETS as readonly string[]).includes(incomeSource)
+  );
 }
 
 function defaultFormValues(transaction: Transaction | null): CreateTransactionInput {
@@ -167,23 +176,27 @@ export default function TransactionsPage() {
     queryKey: ['transactions', dateFrom, dateTo],
     queryFn: async () => getTransactions({ from: dateFrom || undefined, to: dateTo || undefined }),
   });
-  const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: async () => getCategories() });
+  const categoriesQuery = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => getCategories(),
+  });
   const transactions = transactionsQuery.data ?? EMPTY_ARRAY;
   const categories = categoriesQuery.data ?? EMPTY_ARRAY;
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
   // 無料プランと判明している間、または期間制限をすり抜けて403 PLAN_RESTRICTEDが返ってきた場合に案内カードを出す
   const planRestricted =
-    plan === 'free' || (transactionsQuery.isError && isPlanRestrictedError(transactionsQuery.error));
+    plan === 'free' ||
+    (transactionsQuery.isError && isPlanRestrictedError(transactionsQuery.error));
 
   /** 費目フィルタの選択肢。費目マスタ全件ではなく、今フェッチしている取引に実際に登場する費目のみ */
   const displayedCategoryOptions = useMemo(() => {
     const ids = new Set(
-      transactions.filter((tx) => tx.type === 'expense' && tx.categoryId).map((tx) => tx.categoryId as string),
+      transactions
+        .filter((tx) => tx.type === 'expense' && tx.categoryId)
+        .map((tx) => tx.categoryId as string),
     );
-    return categories
-      .filter((c) => ids.has(c.id))
-      .map((c) => ({ value: c.id, label: c.name }));
+    return categories.filter((c) => ids.has(c.id)).map((c) => ({ value: c.id, label: c.name }));
   }, [transactions, categories]);
 
   /** FROMを変更。無料プランのfloorDateより古い値はクランプする。
@@ -227,7 +240,10 @@ export default function TransactionsPage() {
     setMemoQuery('');
   }
 
-  const [dialogState, setDialogState] = useState<{ open: boolean; transaction: Transaction | null }>({
+  const [dialogState, setDialogState] = useState<{
+    open: boolean;
+    transaction: Transaction | null;
+  }>({
     open: false,
     transaction: null,
   });
@@ -324,7 +340,10 @@ export default function TransactionsPage() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => handleDateFromChange(e.target.value)}
-                min={laterDateString(dateTo ? addMonthsToDate(dateTo, -MAX_DATE_RANGE_MONTHS) : undefined, floorDate)}
+                min={laterDateString(
+                  dateTo ? addMonthsToDate(dateTo, -MAX_DATE_RANGE_MONTHS) : undefined,
+                  floorDate,
+                )}
                 max={dateTo || undefined}
                 className="w-36"
               />
@@ -341,7 +360,10 @@ export default function TransactionsPage() {
 
             <MultiSelectFilter
               label="種別"
-              options={TYPE_FILTER_OPTIONS.map((type) => ({ value: type, label: TYPE_LABEL[type] }))}
+              options={TYPE_FILTER_OPTIONS.map((type) => ({
+                value: type,
+                label: TYPE_LABEL[type],
+              }))}
               selected={selectedTypes}
               onChange={(values) => setSelectedTypes(values as TransactionType[])}
             />
@@ -354,9 +376,19 @@ export default function TransactionsPage() {
             />
 
             <div className="flex items-center gap-2">
-              <AmountInput value={amountMin} onChange={setAmountMin} placeholder="下限" className="w-24" />
+              <AmountInput
+                value={amountMin}
+                onChange={setAmountMin}
+                placeholder="下限"
+                className="w-24"
+              />
               <span className="text-muted-foreground text-sm">円〜</span>
-              <AmountInput value={amountMax} onChange={setAmountMax} placeholder="上限" className="w-24" />
+              <AmountInput
+                value={amountMax}
+                onChange={setAmountMax}
+                placeholder="上限"
+                className="w-24"
+              />
               <span className="text-muted-foreground text-sm">円</span>
             </div>
 
@@ -378,7 +410,9 @@ export default function TransactionsPage() {
           ) : transactionsQuery.isError ? (
             // プラン制限エラーは上部の案内カードで説明済みのため、ここでは二重表示しない
             isPlanRestrictedError(transactionsQuery.error) ? null : (
-              <p className="py-8 text-center text-sm text-destructive">取引の読み込みに失敗しました</p>
+              <p className="py-8 text-center text-sm text-destructive">
+                取引の読み込みに失敗しました
+              </p>
             )
           ) : sortedTransactions.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">取引がまだありません</p>
@@ -398,7 +432,9 @@ export default function TransactionsPage() {
                 <tbody>
                   {sortedTransactions.map((tx) => (
                     <tr key={tx.id} className="border-b border-border last:border-0">
-                      <td className="py-2 pr-3 whitespace-nowrap tabular-nums">{formatDate(tx.date)}</td>
+                      <td className="py-2 pr-3 whitespace-nowrap tabular-nums">
+                        {formatDate(tx.date)}
+                      </td>
                       <td className="py-2 pr-3">
                         <Badge variant={TYPE_BADGE_VARIANT[tx.type]}>{TYPE_LABEL[tx.type]}</Badge>
                       </td>
@@ -498,7 +534,11 @@ function TransactionFormDialog({
   transaction: Transaction | null;
   categories: readonly Category[];
   createMutation: UseMutationResult<Transaction, Error, CreateTransactionInput>;
-  updateMutation: UseMutationResult<Transaction, Error, { id: string; input: CreateTransactionInput }>;
+  updateMutation: UseMutationResult<
+    Transaction,
+    Error,
+    { id: string; input: CreateTransactionInput }
+  >;
   onOpenChange: (open: boolean) => void;
 }) {
   const form = useForm<CreateTransactionInput>({
@@ -523,7 +563,10 @@ function TransactionFormDialog({
     const input = buildTransactionInput(values);
     setPendingAction('submit');
     if (transaction) {
-      updateMutation.mutate({ id: transaction.id, input }, { onSuccess: () => onOpenChange(false) });
+      updateMutation.mutate(
+        { id: transaction.id, input },
+        { onSuccess: () => onOpenChange(false) },
+      );
     } else {
       createMutation.mutate(input, { onSuccess: () => onOpenChange(false) });
     }
@@ -610,7 +653,9 @@ function TransactionFormDialog({
               control={form.control}
               name="incomeSource"
               render={({ field }) => {
-                const selectValue = customIncomeSource ? CUSTOM_INCOME_SOURCE : field.value || undefined;
+                const selectValue = customIncomeSource
+                  ? CUSTOM_INCOME_SOURCE
+                  : field.value || undefined;
                 return (
                   <FormItem>
                     <FormLabel>収入源</FormLabel>
@@ -642,7 +687,12 @@ function TransactionFormDialog({
                     </Select>
                     {customIncomeSource ? (
                       <FormControl>
-                        <Input placeholder="収入源を入力" {...field} value={field.value ?? ''} className="mt-2" />
+                        <Input
+                          placeholder="収入源を入力"
+                          {...field}
+                          value={field.value ?? ''}
+                          className="mt-2"
+                        />
                       </FormControl>
                     ) : null}
                     <FormMessage />
@@ -722,7 +772,11 @@ function TransactionFormDialog({
                 連続登録する
               </Button>
             )}
-            <Button type="submit" disabled={pending} loading={pending && pendingAction === 'submit'}>
+            <Button
+              type="submit"
+              disabled={pending}
+              loading={pending && pendingAction === 'submit'}
+            >
               {transaction ? '更新する' : '登録する'}
             </Button>
           </DialogFooter>

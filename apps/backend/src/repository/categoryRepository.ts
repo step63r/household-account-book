@@ -62,9 +62,7 @@ export class DynamoCategoryRepository implements CategoryRepository {
   }
 
   async put(category: Category): Promise<void> {
-    await ddbDocClient.send(
-      new PutCommand({ TableName: getTableName(), Item: toItem(category) }),
-    );
+    await ddbDocClient.send(new PutCommand({ TableName: getTableName(), Item: toItem(category) }));
   }
 
   async putAll(categories: Category[]): Promise<void> {

@@ -30,7 +30,16 @@ export class BatchStack extends cdk.Stack {
     super(scope, id, props);
 
     const fn = new NodejsFunction(this, 'deleteWithdrawnUsersFn', {
-      entry: path.join(__dirname, '..', '..', 'apps', 'backend', 'src', 'handlers', 'deleteWithdrawnUsers.ts'),
+      entry: path.join(
+        __dirname,
+        '..',
+        '..',
+        'apps',
+        'backend',
+        'src',
+        'handlers',
+        'deleteWithdrawnUsers.ts',
+      ),
       handler: 'handler',
       runtime: lambda.Runtime.NODEJS_22_X,
       architecture: lambda.Architecture.ARM_64, // cheaper + faster cold start than x86_64

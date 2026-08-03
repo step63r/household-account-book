@@ -12,7 +12,10 @@ import { z } from 'zod';
  * パスワードポリシー（`requireLowercase` / `requireUppercase` / `requireDigits`）と一致させている。
  */
 export const emailPasswordSchema = z.object({
-  email: z.string().min(1, 'メールアドレスを入力してください').email('メールアドレスの形式が正しくありません'),
+  email: z
+    .string()
+    .min(1, 'メールアドレスを入力してください')
+    .email('メールアドレスの形式が正しくありません'),
   password: z
     .string()
     .min(8, 'パスワードは8文字以上で入力してください')
@@ -43,7 +46,10 @@ export type ConfirmSignUpFormValues = z.infer<typeof confirmSignUpSchema>;
 
 /** 設定画面のメールアドレス変更フォーム用スキーマ。 */
 export const changeEmailSchema = z.object({
-  newEmail: z.string().min(1, 'メールアドレスを入力してください').email('メールアドレスの形式が正しくありません'),
+  newEmail: z
+    .string()
+    .min(1, 'メールアドレスを入力してください')
+    .email('メールアドレスの形式が正しくありません'),
 });
 export type ChangeEmailFormValues = z.infer<typeof changeEmailSchema>;
 
@@ -71,7 +77,10 @@ export type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
 /** パスワード再設定（忘れた場合）のリクエストフォーム用スキーマ。 */
 export const forgotPasswordSchema = z.object({
-  email: z.string().min(1, 'メールアドレスを入力してください').email('メールアドレスの形式が正しくありません'),
+  email: z
+    .string()
+    .min(1, 'メールアドレスを入力してください')
+    .email('メールアドレスの形式が正しくありません'),
 });
 export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 

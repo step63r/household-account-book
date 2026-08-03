@@ -11,7 +11,9 @@ export default function TermsOfServicePage() {
         <CardHeader className="items-center text-center">
           <ShieldCheck className="mb-2 size-8 text-primary" aria-hidden="true" />
           <CardTitle>利用規約・プライバシーポリシー</CardTitle>
-          <CardDescription>本サービスの利用規約およびプライバシーポリシーの全文です。</CardDescription>
+          <CardDescription>
+            本サービスの利用規約およびプライバシーポリシーの全文です。
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <LegalContent />

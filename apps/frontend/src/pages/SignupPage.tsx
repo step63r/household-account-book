@@ -9,7 +9,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import {
   confirmSignUpSchema,
   signUpSchema,
@@ -29,7 +36,9 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   // サインアップ成功後、Cognito のメール確認コード入力ステップへ進む
   // 確認コード検証後に自動ログインするため、パスワードも一時的に保持しておく
-  const [pendingCredentials, setPendingCredentials] = useState<EmailPasswordCredentials | null>(null);
+  const [pendingCredentials, setPendingCredentials] = useState<EmailPasswordCredentials | null>(
+    null,
+  );
 
   const signUpForm = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
@@ -194,9 +203,7 @@ function ConfirmSignUpForm({
         <CardHeader className="items-center text-center">
           <MailCheck className="mb-2 size-8 text-primary" aria-hidden="true" />
           <CardTitle>メールアドレスの確認</CardTitle>
-          <CardDescription>
-            {email} 宛に届いた確認コードを入力してください
-          </CardDescription>
+          <CardDescription>{email} 宛に届いた確認コードを入力してください</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...confirmForm}>

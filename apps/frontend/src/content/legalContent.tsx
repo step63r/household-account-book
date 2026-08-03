@@ -134,7 +134,9 @@ export function PrivacyPolicyContent() {
 
       <section>
         <h4 className="font-medium">4. 第三者提供</h4>
-        <p>運営者は、以下の場合を除き、利用者の同意なく個人情報を第三者に提供することはありません。</p>
+        <p>
+          運営者は、以下の場合を除き、利用者の同意なく個人情報を第三者に提供することはありません。
+        </p>
         <ul className="list-inside list-disc">
           <li>法令に基づき開示が求められる場合</li>
           <li>
@@ -143,7 +145,9 @@ export function PrivacyPolicyContent() {
             （下記「5. 委託」参照）
           </li>
         </ul>
-        <p>広告配信事業者等、本サービスの提供に関与しない第三者へのデータ提供・販売は一切行いません。</p>
+        <p>
+          広告配信事業者等、本サービスの提供に関与しない第三者へのデータ提供・販売は一切行いません。
+        </p>
       </section>
 
       <section>

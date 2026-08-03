@@ -91,7 +91,11 @@ export function SummaryStatTiles({
 }) {
   if (isLoading) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="サマリーを読み込み中" aria-busy="true">
+      <div
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        aria-label="サマリーを読み込み中"
+        aria-busy="true"
+      >
         {[0, 1, 2, 3].map((i) => (
           <Card key={i}>
             <CardHeader className="pb-2">
@@ -114,8 +118,20 @@ export function SummaryStatTiles({
   const previousSavingsRate = previousIncome !== 0 ? previousBalance / previousIncome : NaN;
 
   const tiles: StatTileDatum[] = [
-    { label: '収入', value: currentIncome, previousValue: previousIncome, format: 'yen', goodDirection: 'up' },
-    { label: '支出', value: currentExpense, previousValue: previousExpense, format: 'yen', goodDirection: 'down' },
+    {
+      label: '収入',
+      value: currentIncome,
+      previousValue: previousIncome,
+      format: 'yen',
+      goodDirection: 'up',
+    },
+    {
+      label: '支出',
+      value: currentExpense,
+      previousValue: previousExpense,
+      format: 'yen',
+      goodDirection: 'down',
+    },
     {
       label: '差引残高',
       value: currentBalance,

@@ -13,8 +13,10 @@ function sanitizeDigits(rawValue: string): string {
   return digitsOnly.replace(/^0+(?=\d)/, '');
 }
 
-export interface AmountInputProps
-  extends Omit<React.ComponentProps<typeof Input>, 'type' | 'value' | 'onChange'> {
+export interface AmountInputProps extends Omit<
+  React.ComponentProps<typeof Input>,
+  'type' | 'value' | 'onChange'
+> {
   /** 空欄はNaNで表す（RHFのfield.valueがnumber型のため、undefinedではなくNaNを空欄の番兵値として使う） */
   value: number;
   onChange: (value: number) => void;
