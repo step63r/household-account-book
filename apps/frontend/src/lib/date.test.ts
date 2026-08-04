@@ -2,12 +2,20 @@ import { describe, expect, it } from 'vitest';
 import {
   addMonthsToDate,
   clampDateFrom,
+  formatDateTimeJst,
   formatPeriodLabel,
   formatPeriodTick,
   laterDateString,
   monthDateRange,
   previousYearMonth,
 } from './date';
+
+describe('formatDateTimeJst', () => {
+  it('ISO日時文字列を日本時間の yyyy/MM/dd に変換する', () => {
+    // UTC 2026-01-01T15:30:00Z は JST では 2026-01-02 00:30
+    expect(formatDateTimeJst('2026-01-01T15:30:00.000Z')).toBe('2026/01/02');
+  });
+});
 
 describe('previousYearMonth', () => {
   it('通常の月は月を1つ戻す', () => {

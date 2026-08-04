@@ -1,15 +1,17 @@
 import type { APIGatewayProxyHandlerV2WithJWTAuthorizer } from 'aws-lambda';
-import { requireUserId } from '../lib/auth';
+import { requireEmail, requireUserId } from '../lib/auth';
 import { logAudit } from '../lib/audit';
 import { HttpError, handleError } from '../lib/errors';
 import { jsonResponse } from '../lib/response';
+import { DynamoHouseholdRepository } from '../repository/householdRepository';
 import { DynamoTransactionRepository } from '../repository/transactionRepository';
 import { DynamoUserRepository } from '../repository/userRepository';
 import { deleteTransaction } from '../services/transactionService';
-import { getUserPlan } from '../services/userService';
+import { getUserContext } from '../services/userService';
 
 const repository = new DynamoTransactionRepository();
 const userRepository = new DynamoUserRepository();
+const householdRepository = new DynamoHouseholdRepository();
 
 /**
  * DELETE /transactions/{id} - delete a transaction.
@@ -22,12 +24,18 @@ const userRepository = new DynamoUserRepository();
 export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
   try {
     const userId = requireUserId(event);
+    const email = requireEmail(event);
     const transactionId = event.pathParameters?.id;
     if (!transactionId) {
       throw new HttpError(400, 'Missing path parameter: id');
     }
-    const plan = await getUserPlan(userRepository, userId);
-    await deleteTransaction(repository, userId, transactionId, plan);
+    const { plan, householdId } = await getUserContext(
+      userRepository,
+      householdRepository,
+      userId,
+      email,
+    );
+    await deleteTransaction(repository, householdId, transactionId, plan);
     logAudit({ userId, action: 'transaction.delete', targetId: transactionId });
     return jsonResponse(204);
   } catch (error) {

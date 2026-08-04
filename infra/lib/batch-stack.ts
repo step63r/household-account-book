@@ -20,8 +20,12 @@ export interface BatchStackProps extends cdk.StackProps {
  * apps/backend/src/handlers/deleteWithdrawnUsers.ts (ScheduledHandler) scans PROFILE items for
  * `status = 'pendingDeletion' AND deletionScheduledAt <= now` (Scan+FilterExpression is an
  * explicitly-approved exception to the "Query only, no Scan" table design, limited to this
- * once-a-day offline batch - the table has no GSI for status x date), then for each candidate
- * user Query's every item under that PK and BatchWriteItem-deletes them.
+ * once-a-day offline batch - the table has no GSI for status x date), then for each candidate:
+ * reads the user's householdId (GetItem) and deletes their USER#<userId>/PROFILE item
+ * (DeleteItem); if migrated to a household, removes their MEMBER# item (DeleteItem) and, once no
+ * members remain, cascade-deletes the whole household (Query+BatchWriteItem); if never migrated
+ * (legacy data), falls back to Query+BatchWriteItem-deleting everything under USER#<userId>
+ * (see withdrawalBatchService.ts / userDeletionRepository.ts / householdRepository.ts).
  */
 export class BatchStack extends cdk.Stack {
   public readonly functions: Record<string, NodejsFunction> = {};
@@ -55,9 +59,18 @@ export class BatchStack extends cdk.Stack {
         target: 'node22',
       },
     });
-    // Least-privilege: Scan (find candidates) + Query (list a candidate's items) +
-    // BatchWriteItem (delete them) only - no grantReadWriteData, matching ApiStack's policy.
-    props.table.grant(fn, 'dynamodb:Scan', 'dynamodb:Query', 'dynamodb:BatchWriteItem');
+    // Least-privilege: Scan (find candidates) + GetItem (read a candidate's householdId) +
+    // Query (list a household's/legacy PK's items) + PutItem is NOT needed here (delete-only
+    // batch) + DeleteItem (USER PROFILE / MEMBER# single-item deletes) + BatchWriteItem
+    // (household cascade / legacy PK bulk delete) - no grantReadWriteData, matching ApiStack's policy.
+    props.table.grant(
+      fn,
+      'dynamodb:Scan',
+      'dynamodb:GetItem',
+      'dynamodb:Query',
+      'dynamodb:DeleteItem',
+      'dynamodb:BatchWriteItem',
+    );
     this.functions['deleteWithdrawnUsers'] = fn;
 
     // Once a day, off-peak JST hours (18:10 UTC = 03:10 JST) so it doesn't compete with any

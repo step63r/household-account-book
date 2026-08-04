@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Wallet } from 'lucide-react';
@@ -20,6 +20,8 @@ import { signInWithEmailPassword } from '@/lib/auth';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get('redirect');
   const [error, setError] = useState<string | null>(null);
 
   const form = useForm<EmailPasswordFormValues>({
@@ -31,7 +33,7 @@ export default function LoginPage() {
     setError(null);
     try {
       await signInWithEmailPassword(values);
-      navigate('/dashboard');
+      navigate(redirect ?? '/dashboard');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'ログインに失敗しました');
     }

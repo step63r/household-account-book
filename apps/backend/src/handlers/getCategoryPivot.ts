@@ -1,16 +1,18 @@
 import type { APIGatewayProxyHandlerV2WithJWTAuthorizer } from 'aws-lambda';
-import { requireUserId } from '../lib/auth';
+import { requireEmail, requireUserId } from '../lib/auth';
 import { handleError } from '../lib/errors';
 import { jsonResponse } from '../lib/response';
 import { DynamoCategoryRepository } from '../repository/categoryRepository';
+import { DynamoHouseholdRepository } from '../repository/householdRepository';
 import { DynamoTransactionRepository } from '../repository/transactionRepository';
 import { DynamoUserRepository } from '../repository/userRepository';
 import { categoryPivotQuerySchema, getCategoryPivot } from '../services/aggregationService';
-import { getUserPlan } from '../services/userService';
+import { getUserContext } from '../services/userService';
 
 const transactionRepository = new DynamoTransactionRepository();
 const categoryRepository = new DynamoCategoryRepository();
 const userRepository = new DynamoUserRepository();
+const householdRepository = new DynamoHouseholdRepository();
 
 /**
  * GET /aggregation/category-pivot?from=YYYY-MM-DD&to=YYYY-MM-DD&granularity=day|week|month|year
@@ -20,13 +22,19 @@ const userRepository = new DynamoUserRepository();
 export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
   try {
     const userId = requireUserId(event);
-    // Validate query params before the getUserPlan() DynamoDB round trip (see getTrend.ts).
+    const email = requireEmail(event);
+    // Validate query params before the getUserContext() DynamoDB round trip (see getTrend.ts).
     categoryPivotQuerySchema.parse(event.queryStringParameters);
-    const plan = await getUserPlan(userRepository, userId);
+    const { plan, householdId } = await getUserContext(
+      userRepository,
+      householdRepository,
+      userId,
+      email,
+    );
     const pivot = await getCategoryPivot(
       transactionRepository,
       categoryRepository,
-      userId,
+      householdId,
       event.queryStringParameters,
       plan,
     );

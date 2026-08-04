@@ -21,9 +21,11 @@ describe('upsertBudget', () => {
       amount: 30000,
     });
 
-    expect(budget.userId).toBe('user-1');
+    expect(budget.householdId).toBe('user-1');
     expect(budget.amount).toBe(30000);
-    await expect(repository.listByUserAndMonth('user-1', '2026-07')).resolves.toEqual([budget]);
+    await expect(repository.listByHouseholdAndMonth('user-1', '2026-07')).resolves.toEqual([
+      budget,
+    ]);
   });
 
   it('replaces the existing budget for the same yearMonth+categoryId', async () => {
@@ -40,7 +42,7 @@ describe('upsertBudget', () => {
       amount: 45000,
     });
 
-    const monthBudgets = await repository.listByUserAndMonth('user-1', '2026-07');
+    const monthBudgets = await repository.listByHouseholdAndMonth('user-1', '2026-07');
     expect(monthBudgets).toHaveLength(1);
     expect(monthBudgets[0]!.amount).toBe(45000);
     expect(updated.amount).toBe(45000);

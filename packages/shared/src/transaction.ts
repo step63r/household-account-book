@@ -9,7 +9,9 @@ export type TransactionType = z.infer<typeof transactionTypeSchema>;
 
 export const transactionSchema = z.object({
   id: z.string(),
-  userId: z.string(),
+  householdId: z.string(),
+  /** 実際にこの取引を入力したユーザー（表示用。権限判定には使わない）。 */
+  createdBy: z.string(),
   /** YYYY-MM-DD */
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   type: transactionTypeSchema,

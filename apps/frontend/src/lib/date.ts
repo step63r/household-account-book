@@ -49,6 +49,16 @@ export function formatPeriodTick(period: string, granularity: TrendGranularity):
   return `${Number(m)}/${Number(d)}`;
 }
 
+/** ISO日時文字列（例: 世帯メンバーの joinedAt）を日本時間の yyyy/MM/dd 表示に変換する。 */
+export function formatDateTimeJst(isoDateTime: string): string {
+  return new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(isoDateTime));
+}
+
 /** 日本時間の本日日付（YYYY-MM-DD）。toISOString()はUTC基準になるため使わない
  * （深夜0〜9時のUTC日付が前日にずれる）。 */
 export function todayJst(): string {

@@ -23,6 +23,13 @@ export const userSchema = z.object({
   /** 未設定の既存レコードは free 扱い（userService.ts の読み込み側で補完） */
   plan: userPlanSchema,
   planUpdatedAt: z.string().datetime().optional(),
+  /**
+   * 所属世帯への参照。optional なのは、家族共有機能導入前に作成された既存プロフィールが
+   * 移行スクリプト（scripts/migrateUsersToHouseholds.ts）実行前は未設定のまま存在しうる
+   * 過渡状態を表現するため。userService.ts の ensureProfileWithHousehold はこの値が
+   * 無いプロフィールを検出したら移行未実施として明示的にエラーを返す（フェイルラウド）。
+   */
+  householdId: z.string().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

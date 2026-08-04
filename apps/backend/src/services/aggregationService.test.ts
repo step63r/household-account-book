@@ -23,7 +23,8 @@ function makeTransaction(
   const now = new Date().toISOString();
   return {
     id: nextId('txn'),
-    userId: 'user-1',
+    householdId: 'user-1',
+    createdBy: 'creator-1',
     categoryId: null,
     createdAt: now,
     updatedAt: now,
@@ -34,7 +35,7 @@ function makeTransaction(
 function makeCategory(overrides: Partial<Category> & Pick<Category, 'id' | 'name'>): Category {
   const now = new Date().toISOString();
   return {
-    userId: 'user-1',
+    householdId: 'user-1',
     type: 'variable',
     tooltip: undefined,
     isPreset: false,
@@ -51,7 +52,7 @@ function makeBudget(
   const now = new Date().toISOString();
   return {
     id: nextId('budget'),
-    userId: 'user-1',
+    householdId: 'user-1',
     createdAt: now,
     updatedAt: now,
     ...overrides,

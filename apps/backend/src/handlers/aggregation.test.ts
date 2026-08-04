@@ -50,6 +50,7 @@ function buildEvent(
 
 function buildAuthenticatedEvent(
   userId: string,
+  email: string,
   overrides: Partial<APIGatewayProxyEventV2WithJWTAuthorizer> = {},
 ): APIGatewayProxyEventV2WithJWTAuthorizer {
   const base = buildEvent();
@@ -60,7 +61,7 @@ function buildAuthenticatedEvent(
       authorizer: {
         principalId: userId,
         integrationLatency: 0,
-        jwt: { claims: { sub: userId }, scopes: [] },
+        jwt: { claims: { sub: userId, email }, scopes: [] },
       },
     },
   });
@@ -76,7 +77,7 @@ describe('getTrend handler', () => {
   });
 
   it('returns 400 when required query params are missing', async () => {
-    const event = buildAuthenticatedEvent('user-1');
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com');
 
     const result = await getTrendHandler(event, {} as never, () => undefined);
 
@@ -94,7 +95,7 @@ describe('getCategoryPivot handler', () => {
   });
 
   it('returns 400 when required query params are missing', async () => {
-    const event = buildAuthenticatedEvent('user-1');
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com');
 
     const result = await getCategoryPivotHandler(event, {} as never, () => undefined);
 
@@ -112,7 +113,7 @@ describe('getBudgetVariance handler', () => {
   });
 
   it('returns 400 when yearMonth query param is missing', async () => {
-    const event = buildAuthenticatedEvent('user-1');
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com');
 
     const result = await getBudgetVarianceHandler(event, {} as never, () => undefined);
 
@@ -130,7 +131,7 @@ describe('getMemoSuggestions handler', () => {
   });
 
   it('returns 400 when a query param is not a valid date', async () => {
-    const event = buildAuthenticatedEvent('user-1');
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com');
     event.queryStringParameters = { from: 'not-a-date' };
 
     const result = await getMemoSuggestionsHandler(event, {} as never, () => undefined);

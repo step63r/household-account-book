@@ -46,6 +46,9 @@ const apiStack = new ApiStack(app, `${stackNamePrefix}-Api`, {
   userPool: authStack.userPool,
   userPoolClient: authStack.userPoolClient,
   table: dataStack.table,
+  // Same value passed to AuthStack above (for its password-reset emails) - reused, not
+  // recomputed, for createInvite.ts's invite-email links.
+  frontendBaseUrl,
 });
 
 new HostingStack(app, `${stackNamePrefix}-Hosting`, {

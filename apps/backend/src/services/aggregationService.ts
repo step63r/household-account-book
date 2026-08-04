@@ -17,7 +17,7 @@ const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD')
 
 /**
  * Exported so handlers can validate query params up front, before spending a DynamoDB round
- * trip on getUserPlan() for the free/paid plan check - keeps the "requireUserId()/schema
+ * trip on getUserContext() for the household/plan lookup - keeps the "requireUserId()/schema
  * validation short-circuit before any repository call" invariant the handler unit tests rely
  * on (see apps/backend/src/handlers/aggregation.test.ts's module doc comment).
  */
@@ -77,13 +77,16 @@ function periodOf(date: string, granularity: TrendGranularity): string {
  */
 export async function getTrend(
   transactionRepository: TransactionRepository,
-  userId: string,
+  householdId: string,
   rawQuery: unknown,
   plan: UserPlan = 'paid',
 ): Promise<TrendPoint[]> {
   const { granularity, from, to } = trendQuerySchema.parse(rawQuery);
   const clampedFrom = clampFromParam(plan, from);
-  const transactions = await transactionRepository.listByUser(userId, { from: clampedFrom, to });
+  const transactions = await transactionRepository.listByHousehold(householdId, {
+    from: clampedFrom,
+    to,
+  });
 
   const buckets = new Map<string, { income: number; expense: number; transfer: number }>();
   for (const transaction of transactions) {
@@ -108,15 +111,15 @@ export async function getTrend(
 export async function getCategoryPivot(
   transactionRepository: TransactionRepository,
   categoryRepository: CategoryRepository,
-  userId: string,
+  householdId: string,
   rawQuery: unknown,
   plan: UserPlan = 'paid',
 ): Promise<CategoryPivotRow[]> {
   const { from, to, granularity } = categoryPivotQuerySchema.parse(rawQuery);
   const clampedFrom = clampFromParam(plan, from);
   const [transactions, categories] = await Promise.all([
-    transactionRepository.listByUser(userId, { from: clampedFrom, to }),
-    categoryRepository.listByUser(userId),
+    transactionRepository.listByHousehold(householdId, { from: clampedFrom, to }),
+    categoryRepository.listByHousehold(householdId),
   ]);
   const categoryById = new Map(categories.map((category) => [category.id, category]));
   const rows = new Map<string, CategoryPivotRow>();
@@ -142,7 +145,7 @@ export async function getBudgetVariance(
   transactionRepository: TransactionRepository,
   budgetRepository: BudgetRepository,
   categoryRepository: CategoryRepository,
-  userId: string,
+  householdId: string,
   rawQuery: unknown,
   plan: UserPlan = 'paid',
 ): Promise<BudgetVarianceRow[]> {
@@ -153,9 +156,12 @@ export async function getBudgetVariance(
   // Lexicographic bound over YYYY-MM-DD strings: "-31" safely covers every month's actual
   // last day (a nonexistent "-31" for a 30-day month just matches nothing extra).
   const [transactions, budgets, categories] = await Promise.all([
-    transactionRepository.listByUser(userId, { from: `${yearMonth}-01`, to: `${yearMonth}-31` }),
-    budgetRepository.listByUserAndMonth(userId, yearMonth),
-    categoryRepository.listByUser(userId),
+    transactionRepository.listByHousehold(householdId, {
+      from: `${yearMonth}-01`,
+      to: `${yearMonth}-31`,
+    }),
+    budgetRepository.listByHouseholdAndMonth(householdId, yearMonth),
+    categoryRepository.listByHousehold(householdId),
   ]);
   const categoryById = new Map(categories.map((category) => [category.id, category]));
   const actualByCategory = new Map<string, number>();
@@ -206,14 +212,17 @@ export async function getBudgetVariance(
  */
 export async function getMemoSuggestions(
   transactionRepository: TransactionRepository,
-  userId: string,
+  householdId: string,
   rawQuery: unknown,
   plan: UserPlan = 'paid',
 ): Promise<string[]> {
   const { from, to } = memoSuggestionsQuerySchema.parse(rawQuery);
   // Same from/to period-filter semantics as listTransactions, so clamp identically.
   const clampedFrom = clampFromParam(plan, from);
-  const transactions = await transactionRepository.listByUser(userId, { from: clampedFrom, to });
+  const transactions = await transactionRepository.listByHousehold(householdId, {
+    from: clampedFrom,
+    to,
+  });
 
   const stats = new Map<string, { count: number; lastUsedAt: string }>();
   for (const transaction of transactions) {

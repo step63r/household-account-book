@@ -13,12 +13,14 @@ describe('listCategories', () => {
 
     expect(categories).toHaveLength(PRESET_CATEGORIES.length);
     expect(categories.every((category) => category.isPreset)).toBe(true);
-    expect(categories.every((category) => category.userId === 'user-1')).toBe(true);
+    expect(categories.every((category) => category.householdId === 'user-1')).toBe(true);
     expect(categories.map((category) => category.name)).toEqual(
       PRESET_CATEGORIES.map((preset) => preset.name),
     );
     // Persisted, not just returned in-memory.
-    await expect(repository.listByUser('user-1')).resolves.toHaveLength(PRESET_CATEGORIES.length);
+    await expect(repository.listByHousehold('user-1')).resolves.toHaveLength(
+      PRESET_CATEGORIES.length,
+    );
   });
 
   it('does not reseed presets on a second call', async () => {
@@ -40,7 +42,7 @@ describe('listCategories', () => {
     const userTwoCategories = await listCategories(repository, 'user-2');
 
     expect(userTwoCategories).toHaveLength(PRESET_CATEGORIES.length);
-    expect(userTwoCategories.every((category) => category.userId === 'user-2')).toBe(true);
+    expect(userTwoCategories.every((category) => category.householdId === 'user-2')).toBe(true);
   });
 });
 
@@ -49,7 +51,7 @@ describe('createCategory', () => {
     const repository = new FakeCategoryRepository();
 
     await expect(createCategory(repository, 'user-1', { type: 'fixed' })).rejects.toThrow(ZodError);
-    await expect(repository.listByUser('user-1')).resolves.toEqual([]);
+    await expect(repository.listByHousehold('user-1')).resolves.toEqual([]);
   });
 
   it('rejects a name that is too long', async () => {
@@ -70,7 +72,7 @@ describe('createCategory', () => {
     });
 
     expect(category.isPreset).toBe(false);
-    expect(category.userId).toBe('user-1');
+    expect(category.householdId).toBe('user-1');
     await expect(repository.getById('user-1', category.id)).resolves.toEqual(category);
   });
 });

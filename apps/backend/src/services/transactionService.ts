@@ -31,22 +31,27 @@ function assertCategoryIdRule(type: TransactionType, categoryId: string | null):
 
 export async function listTransactions(
   repository: TransactionRepository,
-  userId: string,
+  householdId: string,
   range?: TransactionListRange,
   plan: UserPlan = 'paid',
 ): Promise<Transaction[]> {
   // free plan: silently narrow to the accessible window instead of erroring - the caller
   // just gets the last FREE_PLAN_HISTORY_MONTHS worth of results.
   const clampedRange: TransactionListRange = { ...range, from: clampFromParam(plan, range?.from) };
-  const transactions = await repository.listByUser(userId, clampedRange);
+  const transactions = await repository.listByHousehold(householdId, clampedRange);
   return transactions
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 }
 
+/**
+ * `createdBy` は実際に入力を行ったユーザー（呼び出し元のuserId）を表す表示用フィールドで、
+ * `householdId`（データの所有者＝世帯）とは独立した引数として受け取る。権限判定には使わない。
+ */
 export async function createTransaction(
   repository: TransactionRepository,
-  userId: string,
+  householdId: string,
+  createdBy: string,
   rawInput: unknown,
   plan: UserPlan = 'paid',
 ): Promise<Transaction> {
@@ -57,7 +62,8 @@ export async function createTransaction(
   const now = new Date().toISOString();
   const transaction: Transaction = {
     id: randomUUID(),
-    userId,
+    householdId,
+    createdBy,
     ...input,
     createdAt: now,
     updatedAt: now,
@@ -68,20 +74,22 @@ export async function createTransaction(
 
 export async function updateTransaction(
   repository: TransactionRepository,
-  userId: string,
+  householdId: string,
   transactionId: string,
   rawInput: unknown,
   plan: UserPlan = 'paid',
 ): Promise<Transaction> {
   const input = updateTransactionInputSchema.parse(rawInput);
 
-  const existing = await repository.getById(userId, transactionId);
+  const existing = await repository.getById(householdId, transactionId);
   if (!existing) {
     throw new NotFoundError(`Transaction ${transactionId} not found`);
   }
   // Reject editing a transaction that's already outside the free-plan window...
   assertWithinPlanWindow(plan, existing.date);
 
+  // `createdBy` is never part of updateTransactionInputSchema, so it's preserved automatically
+  // by this spread - editing a transaction never changes who originally logged it.
   const updated: Transaction = {
     ...existing,
     ...input,
@@ -94,7 +102,7 @@ export async function updateTransaction(
   // `date` is part of the sort key (TXN#<date>#<txnId>), so a date change is a key change:
   // the old item must be removed before the new one is written, not updated in place.
   if (updated.date !== existing.date) {
-    await repository.delete(userId, existing.date, transactionId);
+    await repository.delete(householdId, existing.date, transactionId);
   }
   await repository.put(updated);
   return updated;
@@ -102,14 +110,14 @@ export async function updateTransaction(
 
 export async function deleteTransaction(
   repository: TransactionRepository,
-  userId: string,
+  householdId: string,
   transactionId: string,
   plan: UserPlan = 'paid',
 ): Promise<void> {
-  const existing = await repository.getById(userId, transactionId);
+  const existing = await repository.getById(householdId, transactionId);
   if (!existing) {
     throw new NotFoundError(`Transaction ${transactionId} not found`);
   }
   assertWithinPlanWindow(plan, existing.date);
-  await repository.delete(userId, existing.date, transactionId);
+  await repository.delete(householdId, existing.date, transactionId);
 }

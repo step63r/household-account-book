@@ -23,6 +23,11 @@
  *   GET    /users/me/consent                                src/lib/consent.ts
  *   POST   /users/me/consent
  *   GET    /users/me                                         src/lib/profile.ts（plan: 'free' | 'paid'）
+ *   GET    /households/me                                    src/lib/household.ts
+ *   POST   /households/me/invites  (body: { email })
+ *   GET    /invites/:token          （認証不要。skipAuth: true。招待リンクのプレビュー）
+ *   POST   /invites/:token/accept
+ *   POST   /households/me/leave
  *
  * ログイン/サインアップはこの API を経由しない。CLAUDE.md の設計どおり Cognito User Pool
  * に対して直接（Cognito Hosted UI ではなく `amazon-cognito-identity-js` SDK 経由で）認証する

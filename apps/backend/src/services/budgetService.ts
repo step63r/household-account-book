@@ -4,11 +4,11 @@ import type { BudgetRepository } from '../repository/budgetRepository';
 
 export async function listBudgets(
   repository: BudgetRepository,
-  userId: string,
+  householdId: string,
   rawYearMonth: unknown,
 ): Promise<Budget[]> {
   const yearMonth = yearMonthSchema.parse(rawYearMonth);
-  const budgets = await repository.listByUserAndMonth(userId, yearMonth);
+  const budgets = await repository.listByHouseholdAndMonth(householdId, yearMonth);
   return budgets.slice().sort((a, b) => a.categoryId.localeCompare(b.categoryId));
 }
 
@@ -19,14 +19,14 @@ export async function listBudgets(
  */
 export async function upsertBudget(
   repository: BudgetRepository,
-  userId: string,
+  householdId: string,
   rawInput: unknown,
 ): Promise<Budget> {
   const input = upsertBudgetInputSchema.parse(rawInput);
   const now = new Date().toISOString();
   const budget: Budget = {
     id: randomUUID(),
-    userId,
+    householdId,
     ...input,
     createdAt: now,
     updatedAt: now,

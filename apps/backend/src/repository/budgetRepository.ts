@@ -1,12 +1,12 @@
 import { PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import type { Budget } from '@household/shared';
 import { ddbDocClient, getTableName } from './dynamoClient';
-import { BUDGET_SK_PREFIX, budgetSk, userPk } from './keys';
+import { BUDGET_SK_PREFIX, budgetSk, householdPk } from './keys';
 
 /** Repository contract, kept separate from the DynamoDB implementation so handler/service
  * logic can be unit-tested against an in-memory fake instead of real AWS. */
 export interface BudgetRepository {
-  listByUserAndMonth(userId: string, yearMonth: string): Promise<Budget[]>;
+  listByHouseholdAndMonth(householdId: string, yearMonth: string): Promise<Budget[]>;
   /** Create-or-replace; the sort key (yearMonth + categoryId) makes this naturally idempotent
    * (see handlers/upsertBudget.ts), so no separate get-before-write lookup is needed. */
   put(budget: Budget): Promise<void>;
@@ -20,7 +20,7 @@ interface BudgetItem extends Budget {
 function toItem(budget: Budget): BudgetItem {
   return {
     ...budget,
-    PK: userPk(budget.userId),
+    PK: householdPk(budget.householdId),
     SK: budgetSk(budget.yearMonth, budget.categoryId),
   };
 }
@@ -31,13 +31,13 @@ function fromItem(item: Record<string, unknown>): Budget {
 }
 
 export class DynamoBudgetRepository implements BudgetRepository {
-  async listByUserAndMonth(userId: string, yearMonth: string): Promise<Budget[]> {
+  async listByHouseholdAndMonth(householdId: string, yearMonth: string): Promise<Budget[]> {
     const result = await ddbDocClient.send(
       new QueryCommand({
         TableName: getTableName(),
         KeyConditionExpression: 'PK = :pk AND begins_with(SK, :skPrefix)',
         ExpressionAttributeValues: {
-          ':pk': userPk(userId),
+          ':pk': householdPk(householdId),
           ':skPrefix': `${BUDGET_SK_PREFIX}${yearMonth}#`,
         },
       }),

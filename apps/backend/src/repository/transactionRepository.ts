@@ -1,7 +1,7 @@
 import { DeleteCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import type { Transaction } from '@household/shared';
 import { ddbDocClient, getTableName } from './dynamoClient';
-import { TRANSACTION_SK_PREFIX, transactionSk, userPk } from './keys';
+import { TRANSACTION_SK_PREFIX, transactionSk, householdPk } from './keys';
 
 /** Inclusive date range (YYYY-MM-DD) to scope a transaction list Query. */
 export interface TransactionListRange {
@@ -12,11 +12,11 @@ export interface TransactionListRange {
 /** Repository contract, kept separate from the DynamoDB implementation so handler/service
  * logic can be unit-tested against an in-memory fake instead of real AWS. */
 export interface TransactionRepository {
-  listByUser(userId: string, range?: TransactionListRange): Promise<Transaction[]>;
-  getById(userId: string, transactionId: string): Promise<Transaction | undefined>;
+  listByHousehold(householdId: string, range?: TransactionListRange): Promise<Transaction[]>;
+  getById(householdId: string, transactionId: string): Promise<Transaction | undefined>;
   put(transaction: Transaction): Promise<void>;
   /** `date` is required because it's part of the sort key and can't be derived from id alone. */
-  delete(userId: string, date: string, transactionId: string): Promise<void>;
+  delete(householdId: string, date: string, transactionId: string): Promise<void>;
 }
 
 interface TransactionItem extends Transaction {
@@ -27,7 +27,7 @@ interface TransactionItem extends Transaction {
 function toItem(transaction: Transaction): TransactionItem {
   return {
     ...transaction,
-    PK: userPk(transaction.userId),
+    PK: householdPk(transaction.householdId),
     SK: transactionSk(transaction.date, transaction.id),
   };
 }
@@ -40,11 +40,11 @@ function fromItem(item: Record<string, unknown>): Transaction {
 /** Sorts higher than any real sort key sharing the same TXN#<date># prefix, so appending it
  * to a date-only prefix turns an inclusive upper bound into a range that covers every
  * transaction id recorded on that date. */
-const SK_UPPER_BOUND_SUFFIX = '\uFFFF';
+const SK_UPPER_BOUND_SUFFIX = '￿';
 
 export class DynamoTransactionRepository implements TransactionRepository {
-  async listByUser(userId: string, range?: TransactionListRange): Promise<Transaction[]> {
-    const pk = userPk(userId);
+  async listByHousehold(householdId: string, range?: TransactionListRange): Promise<Transaction[]> {
+    const pk = householdPk(householdId);
     const from = range?.from;
     const to = range?.to;
 
@@ -85,12 +85,12 @@ export class DynamoTransactionRepository implements TransactionRepository {
     return (result.Items ?? []).map(fromItem);
   }
 
-  async getById(userId: string, transactionId: string): Promise<Transaction | undefined> {
+  async getById(householdId: string, transactionId: string): Promise<Transaction | undefined> {
     // The sort key embeds `date`, which isn't known from `transactionId` alone, so a direct
-    // GetCommand isn't possible. Query the user's full TXN# range and filter in memory instead
-    // of adding a GSI - see infra/lib/data-stack.ts for the "no GSI until a concrete pattern
-    // needs one" policy this follows.
-    const transactions = await this.listByUser(userId);
+    // GetCommand isn't possible. Query the household's full TXN# range and filter in memory
+    // instead of adding a GSI - see infra/lib/data-stack.ts for the "no GSI until a concrete
+    // pattern needs one" policy this follows.
+    const transactions = await this.listByHousehold(householdId);
     return transactions.find((transaction) => transaction.id === transactionId);
   }
 
@@ -100,11 +100,11 @@ export class DynamoTransactionRepository implements TransactionRepository {
     );
   }
 
-  async delete(userId: string, date: string, transactionId: string): Promise<void> {
+  async delete(householdId: string, date: string, transactionId: string): Promise<void> {
     await ddbDocClient.send(
       new DeleteCommand({
         TableName: getTableName(),
-        Key: { PK: userPk(userId), SK: transactionSk(date, transactionId) },
+        Key: { PK: householdPk(householdId), SK: transactionSk(date, transactionId) },
       }),
     );
   }

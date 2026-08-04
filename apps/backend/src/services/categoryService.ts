@@ -9,16 +9,15 @@ import type { CategoryRepository } from '../repository/categoryRepository';
 import { NotFoundError } from '../lib/errors';
 
 /**
- * Lists the caller's categories. On a brand-new user (no CATEGORY# items yet), lazily seeds
- * the preset category master (packages/shared PRESET_CATEGORIES) into user-owned items and
- * persists them before returning - see CLAUDE.md: presets are copied on first login, then
- * owned/editable independently of the immutable preset master.
+ * 世帯の費目を一覧する。費目未作成（新規世帯）の場合、プリセット費目マスタ
+ * （packages/shared PRESET_CATEGORIES）を世帯所有アイテムとして遅延投入して保存する -
+ * CLAUDE.md参照: プリセットは初回登録時にコピーし、以後は独立して所有・編集できる。
  */
 export async function listCategories(
   repository: CategoryRepository,
-  userId: string,
+  householdId: string,
 ): Promise<Category[]> {
-  const existing = await repository.listByUser(userId);
+  const existing = await repository.listByHousehold(householdId);
   if (existing.length > 0) {
     return existing.slice().sort((a, b) => a.sortOrder - b.sortOrder);
   }
@@ -26,7 +25,7 @@ export async function listCategories(
   const now = new Date().toISOString();
   const seeded: Category[] = PRESET_CATEGORIES.map((preset, index) => ({
     id: randomUUID(),
-    userId,
+    householdId,
     name: preset.name,
     type: preset.type,
     tooltip: preset.tooltip,
@@ -41,17 +40,17 @@ export async function listCategories(
 
 export async function createCategory(
   repository: CategoryRepository,
-  userId: string,
+  householdId: string,
   rawInput: unknown,
 ): Promise<Category> {
   const input = createCategoryInputSchema.parse(rawInput);
 
   // New user-added categories sort after the current list (presets occupy 0..N-1).
-  const existing = await repository.listByUser(userId);
+  const existing = await repository.listByHousehold(householdId);
   const now = new Date().toISOString();
   const category: Category = {
     id: randomUUID(),
-    userId,
+    householdId,
     name: input.name,
     type: input.type,
     tooltip: input.tooltip,
@@ -66,13 +65,13 @@ export async function createCategory(
 
 export async function updateCategory(
   repository: CategoryRepository,
-  userId: string,
+  householdId: string,
   categoryId: string,
   rawInput: unknown,
 ): Promise<Category> {
   const input = updateCategoryInputSchema.parse(rawInput);
 
-  const existing = await repository.getById(userId, categoryId);
+  const existing = await repository.getById(householdId, categoryId);
   if (!existing) {
     throw new NotFoundError(`Category ${categoryId} not found`);
   }
@@ -88,12 +87,12 @@ export async function updateCategory(
 
 export async function deleteCategory(
   repository: CategoryRepository,
-  userId: string,
+  householdId: string,
   categoryId: string,
 ): Promise<void> {
-  const existing = await repository.getById(userId, categoryId);
+  const existing = await repository.getById(householdId, categoryId);
   if (!existing) {
     throw new NotFoundError(`Category ${categoryId} not found`);
   }
-  await repository.delete(userId, categoryId);
+  await repository.delete(householdId, categoryId);
 }

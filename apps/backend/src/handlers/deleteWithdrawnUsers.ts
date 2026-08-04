@@ -1,5 +1,6 @@
 import type { ScheduledHandler } from 'aws-lambda';
 import { logAudit } from '../lib/audit';
+import { DynamoHouseholdRepository } from '../repository/householdRepository';
 import { DynamoUserDeletionRepository } from '../repository/userDeletionRepository';
 import { runWithdrawalDeletionBatch } from '../services/withdrawalBatchService';
 
@@ -10,8 +11,9 @@ import { runWithdrawalDeletionBatch } from '../services/withdrawalBatchService';
  * there's no HTTP response to shape, only success/failure of the scheduled invocation.
  */
 export const handler: ScheduledHandler = async () => {
-  const repository = new DynamoUserDeletionRepository();
-  const result = await runWithdrawalDeletionBatch(repository);
+  const userDeletionRepository = new DynamoUserDeletionRepository();
+  const householdRepository = new DynamoHouseholdRepository();
+  const result = await runWithdrawalDeletionBatch(userDeletionRepository, householdRepository);
 
   logAudit({
     userId: 'system',

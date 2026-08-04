@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
@@ -33,6 +33,13 @@ import { LegalContent } from '@/content/legalContent';
 import { recordConsent } from '@/lib/consent';
 
 export default function SignupPage() {
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get('redirect');
+  // 招待経由のサインアップ（/join-household からの導線）では、招待されたメールアドレス以外での
+  // 登録を避けるため、email クエリパラメータがあればフォームに固定表示する
+  // （受諾自体はバックエンドがサーバー側で email 一致検証するが、ここでの入力ミスを未然に防ぐ）
+  const prefillEmail = searchParams.get('email');
+
   const [error, setError] = useState<string | null>(null);
   // サインアップ成功後、Cognito のメール確認コード入力ステップへ進む
   // 確認コード検証後に自動ログインするため、パスワードも一時的に保持しておく
@@ -42,7 +49,7 @@ export default function SignupPage() {
 
   const signUpForm = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
-    defaultValues: { email: '', password: '', agreedToTerms: false },
+    defaultValues: { email: prefillEmail ?? '', password: '', agreedToTerms: false },
   });
   const agreedToTerms = signUpForm.watch('agreedToTerms');
 
@@ -61,6 +68,7 @@ export default function SignupPage() {
       <ConfirmSignUpForm
         email={pendingCredentials.email}
         password={pendingCredentials.password}
+        redirect={redirect}
         onBackToSignUp={() => setPendingCredentials(null)}
       />
     );
@@ -84,8 +92,18 @@ export default function SignupPage() {
                   <FormItem>
                     <FormLabel>メールアドレス</FormLabel>
                     <FormControl>
-                      <Input type="email" autoComplete="email" {...field} />
+                      <Input
+                        type="email"
+                        autoComplete="email"
+                        disabled={!!prefillEmail}
+                        {...field}
+                      />
                     </FormControl>
+                    {prefillEmail && (
+                      <p className="text-xs text-muted-foreground">
+                        招待されたメールアドレスで登録します
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -152,10 +170,12 @@ export default function SignupPage() {
 function ConfirmSignUpForm({
   email,
   password,
+  redirect,
   onBackToSignUp,
 }: {
   email: string;
   password: string;
+  redirect: string | null;
   onBackToSignUp: () => void;
 }) {
   const navigate = useNavigate();
@@ -177,10 +197,11 @@ function ConfirmSignUpForm({
     }
 
     // 確認自体は完了しているため、自動ログインに失敗してもログイン画面へ誘導する（登録をやり直させない）
+    // redirect があれば、手動ログイン後も元の遷移先（招待参加フロー等）に戻れるよう引き継ぐ
     try {
       await signInWithEmailPassword({ email, password });
     } catch {
-      navigate('/login');
+      navigate(redirect ? `/login?${new URLSearchParams({ redirect }).toString()}` : '/login');
       return;
     }
 
@@ -194,7 +215,7 @@ function ConfirmSignUpForm({
       // no-op: 同意記録に失敗しても /consent へのフォールバックで救済される
     }
 
-    navigate('/dashboard');
+    navigate(redirect ?? '/dashboard');
   });
 
   return (

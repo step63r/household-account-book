@@ -1,4 +1,5 @@
 import { logAudit } from '../lib/audit';
+import type { HouseholdRepository } from '../repository/householdRepository';
 import type { UserDeletionRepository } from '../repository/userDeletionRepository';
 
 export interface WithdrawalDeletionBatchResult {
@@ -14,19 +15,39 @@ export interface WithdrawalDeletionBatchResult {
  *
  * Candidates are processed sequentially (not in parallel) and one user's failure never stops
  * the rest of the batch from being processed - the failure is recorded and the batch moves on.
+ *
+ * Per candidate: delete the USER#<userId>/PROFILE item, then either (a) if the user was
+ * migrated to a household, remove their MEMBER# item and cascade-delete the whole household
+ * once no members remain, or (b) if the user never got migrated (legacy data still living
+ * directly under USER#<userId>), fall back to deleting everything under that partition key.
  */
 export async function runWithdrawalDeletionBatch(
-  repository: UserDeletionRepository,
+  userDeletionRepository: UserDeletionRepository,
+  householdRepository: HouseholdRepository,
   now: Date = new Date(),
 ): Promise<WithdrawalDeletionBatchResult> {
-  const candidates = await repository.findCandidates(now.toISOString());
+  const candidates = await userDeletionRepository.findCandidates(now.toISOString());
 
   const processedUserIds: string[] = [];
   const failedUserIds: string[] = [];
 
   for (const candidate of candidates) {
     try {
-      const deletedItemCount = await repository.deleteAllItemsForUser(candidate.userId);
+      const householdId = await userDeletionRepository.getUserHouseholdId(candidate.userId);
+      await userDeletionRepository.deleteUserProfile(candidate.userId);
+      let deletedItemCount = 1;
+
+      if (householdId) {
+        await householdRepository.deleteMember(householdId, candidate.userId);
+        deletedItemCount += 1;
+        const remaining = await householdRepository.listMembers(householdId);
+        if (remaining.length === 0) {
+          deletedItemCount += await householdRepository.deleteAllItems(householdId);
+        }
+      } else {
+        deletedItemCount += await userDeletionRepository.deleteAllLegacyItems(candidate.userId);
+      }
+
       logAudit({
         userId: candidate.userId,
         action: 'user.physicalDelete',

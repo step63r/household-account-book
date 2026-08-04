@@ -6,7 +6,7 @@ export type YearMonth = z.infer<typeof yearMonthSchema>;
 
 export const budgetSchema = z.object({
   id: z.string(),
-  userId: z.string(),
+  householdId: z.string(),
   yearMonth: yearMonthSchema,
   categoryId: z.string(),
   /** 円単位の整数 */

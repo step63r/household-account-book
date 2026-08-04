@@ -6,3 +6,4 @@ export * from './user';
 export * from './aggregation';
 export * from './consent';
 export * from './plan';
+export * from './household';

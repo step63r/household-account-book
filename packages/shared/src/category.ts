@@ -5,7 +5,7 @@ export type CategoryType = z.infer<typeof categoryTypeSchema>;
 
 export const categorySchema = z.object({
   id: z.string(),
-  userId: z.string(),
+  householdId: z.string(),
   name: z.string().min(1).max(50),
   type: categoryTypeSchema,
   /** ツールチップ表示用の補足説明（例: 「家賃、住宅ローン、管理費など」） */

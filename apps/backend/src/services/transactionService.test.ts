@@ -20,17 +20,17 @@ describe('createTransaction', () => {
   it('rejects invalid input', async () => {
     const repository = new FakeTransactionRepository();
 
-    await expect(createTransaction(repository, 'user-1', { type: 'expense' })).rejects.toThrow(
-      ZodError,
-    );
-    await expect(repository.listByUser('user-1')).resolves.toEqual([]);
+    await expect(
+      createTransaction(repository, 'user-1', 'creator-1', { type: 'expense' }),
+    ).rejects.toThrow(ZodError);
+    await expect(repository.listByHousehold('user-1')).resolves.toEqual([]);
   });
 
   it('rejects expense with a null categoryId', async () => {
     const repository = new FakeTransactionRepository();
 
     await expect(
-      createTransaction(repository, 'user-1', { ...validExpense, categoryId: null }),
+      createTransaction(repository, 'user-1', 'creator-1', { ...validExpense, categoryId: null }),
     ).rejects.toThrow(HttpError);
   });
 
@@ -38,7 +38,7 @@ describe('createTransaction', () => {
     const repository = new FakeTransactionRepository();
 
     await expect(
-      createTransaction(repository, 'user-1', {
+      createTransaction(repository, 'user-1', 'creator-1', {
         date: '2026-07-10',
         type: 'transfer',
         categoryId: 'category-1',
@@ -50,7 +50,7 @@ describe('createTransaction', () => {
   it('accepts transfer with a null categoryId', async () => {
     const repository = new FakeTransactionRepository();
 
-    const transaction = await createTransaction(repository, 'user-1', {
+    const transaction = await createTransaction(repository, 'user-1', 'creator-1', {
       date: '2026-07-10',
       type: 'transfer',
       categoryId: null,
@@ -66,7 +66,7 @@ describe('createTransaction', () => {
     const repository = new FakeTransactionRepository();
 
     await expect(
-      createTransaction(repository, 'user-1', {
+      createTransaction(repository, 'user-1', 'creator-1', {
         date: '2026-07-10',
         type: 'income',
         categoryId: 'category-1',
@@ -78,7 +78,7 @@ describe('createTransaction', () => {
   it('accepts income with a null categoryId and an incomeSource', async () => {
     const repository = new FakeTransactionRepository();
 
-    const transaction = await createTransaction(repository, 'user-1', {
+    const transaction = await createTransaction(repository, 'user-1', 'creator-1', {
       date: '2026-07-10',
       type: 'income',
       categoryId: null,
@@ -94,9 +94,9 @@ describe('createTransaction', () => {
   it('creates and persists a valid expense', async () => {
     const repository = new FakeTransactionRepository();
 
-    const transaction = await createTransaction(repository, 'user-1', validExpense);
+    const transaction = await createTransaction(repository, 'user-1', 'creator-1', validExpense);
 
-    expect(transaction.userId).toBe('user-1');
+    expect(transaction.householdId).toBe('user-1');
     expect(transaction.amount).toBe(1200);
     await expect(repository.getById('user-1', transaction.id)).resolves.toEqual(transaction);
   });
@@ -105,20 +105,29 @@ describe('createTransaction', () => {
 describe('listTransactions', () => {
   it("returns only the caller's own transactions", async () => {
     const repository = new FakeTransactionRepository();
-    await createTransaction(repository, 'user-1', validExpense);
-    await createTransaction(repository, 'user-2', validExpense);
+    await createTransaction(repository, 'user-1', 'creator-1', validExpense);
+    await createTransaction(repository, 'user-2', 'creator-1', validExpense);
 
     const userOneTransactions = await listTransactions(repository, 'user-1');
 
     expect(userOneTransactions).toHaveLength(1);
-    expect(userOneTransactions[0]!.userId).toBe('user-1');
+    expect(userOneTransactions[0]!.householdId).toBe('user-1');
   });
 
   it('filters by from/to date range inclusively', async () => {
     const repository = new FakeTransactionRepository();
-    await createTransaction(repository, 'user-1', { ...validExpense, date: '2026-07-01' });
-    await createTransaction(repository, 'user-1', { ...validExpense, date: '2026-07-10' });
-    await createTransaction(repository, 'user-1', { ...validExpense, date: '2026-07-20' });
+    await createTransaction(repository, 'user-1', 'creator-1', {
+      ...validExpense,
+      date: '2026-07-01',
+    });
+    await createTransaction(repository, 'user-1', 'creator-1', {
+      ...validExpense,
+      date: '2026-07-10',
+    });
+    await createTransaction(repository, 'user-1', 'creator-1', {
+      ...validExpense,
+      date: '2026-07-20',
+    });
 
     const inRange = await listTransactions(repository, 'user-1', {
       from: '2026-07-01',
@@ -140,7 +149,7 @@ describe('updateTransaction', () => {
 
   it('rejects invalid input', async () => {
     const repository = new FakeTransactionRepository();
-    const transaction = await createTransaction(repository, 'user-1', validExpense);
+    const transaction = await createTransaction(repository, 'user-1', 'creator-1', validExpense);
 
     await expect(
       updateTransaction(repository, 'user-1', transaction.id, { type: 'not-a-type' }),
@@ -149,7 +158,7 @@ describe('updateTransaction', () => {
 
   it('rejects a merged result that violates the categoryId rule', async () => {
     const repository = new FakeTransactionRepository();
-    const transaction = await createTransaction(repository, 'user-1', validExpense);
+    const transaction = await createTransaction(repository, 'user-1', 'creator-1', validExpense);
 
     // Flipping to transfer without clearing categoryId must be rejected, even though only
     // `type` was provided in this partial update.
@@ -160,7 +169,7 @@ describe('updateTransaction', () => {
 
   it('updates only the provided fields and bumps updatedAt', async () => {
     const repository = new FakeTransactionRepository();
-    const transaction = await createTransaction(repository, 'user-1', validExpense);
+    const transaction = await createTransaction(repository, 'user-1', 'creator-1', validExpense);
 
     const updated = await updateTransaction(repository, 'user-1', transaction.id, {
       amount: 3000,
@@ -175,7 +184,7 @@ describe('updateTransaction', () => {
     const repository = new FakeTransactionRepository();
     const deleteSpy = vi.spyOn(repository, 'delete');
     const putSpy = vi.spyOn(repository, 'put');
-    const transaction = await createTransaction(repository, 'user-1', validExpense);
+    const transaction = await createTransaction(repository, 'user-1', 'creator-1', validExpense);
 
     const updated = await updateTransaction(repository, 'user-1', transaction.id, {
       date: '2026-08-01',
@@ -190,7 +199,7 @@ describe('updateTransaction', () => {
   it('does not call delete when date is unchanged', async () => {
     const repository = new FakeTransactionRepository();
     const deleteSpy = vi.spyOn(repository, 'delete');
-    const transaction = await createTransaction(repository, 'user-1', validExpense);
+    const transaction = await createTransaction(repository, 'user-1', 'creator-1', validExpense);
 
     await updateTransaction(repository, 'user-1', transaction.id, { amount: 500 });
 
@@ -209,7 +218,7 @@ describe('deleteTransaction', () => {
 
   it('deletes an existing transaction', async () => {
     const repository = new FakeTransactionRepository();
-    const transaction = await createTransaction(repository, 'user-1', validExpense);
+    const transaction = await createTransaction(repository, 'user-1', 'creator-1', validExpense);
 
     await deleteTransaction(repository, 'user-1', transaction.id);
 
@@ -238,6 +247,7 @@ describe('plan-based access window', () => {
         createTransaction(
           repository,
           'user-1',
+          'creator-1',
           { ...validExpense, date: dateOutsideWindow },
           'free',
         ),
@@ -250,6 +260,7 @@ describe('plan-based access window', () => {
       const transaction = await createTransaction(
         repository,
         'user-1',
+        'creator-1',
         { ...validExpense, date: dateWithinWindow },
         'free',
       );
@@ -263,6 +274,7 @@ describe('plan-based access window', () => {
       const transaction = await createTransaction(
         repository,
         'user-1',
+        'creator-1',
         { ...validExpense, date: dateFarInThePast },
         'paid',
       );
@@ -277,12 +289,14 @@ describe('plan-based access window', () => {
       await createTransaction(
         repository,
         'user-1',
+        'creator-1',
         { ...validExpense, date: dateOutsideWindow },
         'paid',
       );
       await createTransaction(
         repository,
         'user-1',
+        'creator-1',
         { ...validExpense, date: dateWithinWindow },
         'paid',
       );
@@ -302,6 +316,7 @@ describe('plan-based access window', () => {
       await createTransaction(
         repository,
         'user-1',
+        'creator-1',
         { ...validExpense, date: dateOutsideWindow },
         'paid',
       );
@@ -323,6 +338,7 @@ describe('plan-based access window', () => {
       const transaction = await createTransaction(
         repository,
         'user-1',
+        'creator-1',
         { ...validExpense, date: dateOutsideWindow },
         'paid',
       );
@@ -337,6 +353,7 @@ describe('plan-based access window', () => {
       const transaction = await createTransaction(
         repository,
         'user-1',
+        'creator-1',
         { ...validExpense, date: dateWithinWindow },
         'free',
       );
@@ -357,6 +374,7 @@ describe('plan-based access window', () => {
       const transaction = await createTransaction(
         repository,
         'user-1',
+        'creator-1',
         { ...validExpense, date: dateFarInThePast },
         'paid',
       );
@@ -379,6 +397,7 @@ describe('plan-based access window', () => {
       const transaction = await createTransaction(
         repository,
         'user-1',
+        'creator-1',
         { ...validExpense, date: dateOutsideWindow },
         'paid',
       );
@@ -393,6 +412,7 @@ describe('plan-based access window', () => {
       const transaction = await createTransaction(
         repository,
         'user-1',
+        'creator-1',
         { ...validExpense, date: dateFarInThePast },
         'paid',
       );

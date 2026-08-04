@@ -8,17 +8,17 @@ import type { BudgetRepository } from './budgetRepository';
 export class FakeBudgetRepository implements BudgetRepository {
   private readonly itemsByKey = new Map<string, Budget>();
 
-  private key(userId: string, yearMonth: string, categoryId: string): string {
-    return `${userId}#${yearMonth}#${categoryId}`;
+  private key(householdId: string, yearMonth: string, categoryId: string): string {
+    return `${householdId}#${yearMonth}#${categoryId}`;
   }
 
-  async listByUserAndMonth(userId: string, yearMonth: string): Promise<Budget[]> {
+  async listByHouseholdAndMonth(householdId: string, yearMonth: string): Promise<Budget[]> {
     return [...this.itemsByKey.values()].filter(
-      (budget) => budget.userId === userId && budget.yearMonth === yearMonth,
+      (budget) => budget.householdId === householdId && budget.yearMonth === yearMonth,
     );
   }
 
   async put(budget: Budget): Promise<void> {
-    this.itemsByKey.set(this.key(budget.userId, budget.yearMonth, budget.categoryId), budget);
+    this.itemsByKey.set(this.key(budget.householdId, budget.yearMonth, budget.categoryId), budget);
   }
 }

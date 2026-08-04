@@ -8,13 +8,13 @@ import type { TransactionListRange, TransactionRepository } from './transactionR
 export class FakeTransactionRepository implements TransactionRepository {
   private readonly itemsByKey = new Map<string, Transaction>();
 
-  private key(userId: string, transactionId: string): string {
-    return `${userId}#${transactionId}`;
+  private key(householdId: string, transactionId: string): string {
+    return `${householdId}#${transactionId}`;
   }
 
-  async listByUser(userId: string, range?: TransactionListRange): Promise<Transaction[]> {
+  async listByHousehold(householdId: string, range?: TransactionListRange): Promise<Transaction[]> {
     let transactions = [...this.itemsByKey.values()].filter(
-      (transaction) => transaction.userId === userId,
+      (transaction) => transaction.householdId === householdId,
     );
     if (range?.from) {
       transactions = transactions.filter((transaction) => transaction.date >= range.from!);
@@ -25,15 +25,15 @@ export class FakeTransactionRepository implements TransactionRepository {
     return transactions;
   }
 
-  async getById(userId: string, transactionId: string): Promise<Transaction | undefined> {
-    return this.itemsByKey.get(this.key(userId, transactionId));
+  async getById(householdId: string, transactionId: string): Promise<Transaction | undefined> {
+    return this.itemsByKey.get(this.key(householdId, transactionId));
   }
 
   async put(transaction: Transaction): Promise<void> {
-    this.itemsByKey.set(this.key(transaction.userId, transaction.id), transaction);
+    this.itemsByKey.set(this.key(transaction.householdId, transaction.id), transaction);
   }
 
-  async delete(userId: string, _date: string, transactionId: string): Promise<void> {
-    this.itemsByKey.delete(this.key(userId, transactionId));
+  async delete(householdId: string, _date: string, transactionId: string): Promise<void> {
+    this.itemsByKey.delete(this.key(householdId, transactionId));
   }
 }

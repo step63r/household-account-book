@@ -50,6 +50,7 @@ function buildEvent(
 
 function buildAuthenticatedEvent(
   userId: string,
+  email: string,
   overrides: Partial<APIGatewayProxyEventV2WithJWTAuthorizer> = {},
 ): APIGatewayProxyEventV2WithJWTAuthorizer {
   const base = buildEvent();
@@ -60,7 +61,7 @@ function buildAuthenticatedEvent(
       authorizer: {
         principalId: userId,
         integrationLatency: 0,
-        jwt: { claims: { sub: userId }, scopes: [] },
+        jwt: { claims: { sub: userId, email }, scopes: [] },
       },
     },
   });
@@ -86,7 +87,7 @@ describe('createTransaction handler', () => {
   });
 
   it('returns 400 for a missing request body', async () => {
-    const event = buildAuthenticatedEvent('user-1', { body: undefined });
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', { body: undefined });
 
     const result = await createTransactionHandler(event, {} as never, () => undefined);
 
@@ -94,7 +95,7 @@ describe('createTransaction handler', () => {
   });
 
   it('returns 400 for a payload that fails createTransactionInputSchema validation', async () => {
-    const event = buildAuthenticatedEvent('user-1', {
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', {
       body: JSON.stringify({ type: 'expense' }), // missing required date/categoryId/amount
     });
 
@@ -114,7 +115,7 @@ describe('updateTransaction handler', () => {
   });
 
   it('returns 400 when the id path parameter is missing', async () => {
-    const event = buildAuthenticatedEvent('user-1', {
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', {
       pathParameters: undefined,
       body: JSON.stringify({}),
     });
@@ -135,7 +136,9 @@ describe('deleteTransaction handler', () => {
   });
 
   it('returns 400 when the id path parameter is missing', async () => {
-    const event = buildAuthenticatedEvent('user-1', { pathParameters: undefined });
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', {
+      pathParameters: undefined,
+    });
 
     const result = await deleteTransactionHandler(event, {} as never, () => undefined);
 

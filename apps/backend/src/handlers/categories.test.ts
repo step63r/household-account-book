@@ -48,6 +48,7 @@ function buildEvent(
 
 function buildAuthenticatedEvent(
   userId: string,
+  email: string,
   overrides: Partial<APIGatewayProxyEventV2WithJWTAuthorizer> = {},
 ): APIGatewayProxyEventV2WithJWTAuthorizer {
   const base = buildEvent();
@@ -58,7 +59,7 @@ function buildAuthenticatedEvent(
       authorizer: {
         principalId: userId,
         integrationLatency: 0,
-        jwt: { claims: { sub: userId }, scopes: [] },
+        jwt: { claims: { sub: userId, email }, scopes: [] },
       },
     },
   });
@@ -76,7 +77,7 @@ describe('listCategories handler', () => {
 
 describe('createCategory handler', () => {
   it('returns 400 for a missing request body', async () => {
-    const event = buildAuthenticatedEvent('user-1', { body: undefined });
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', { body: undefined });
 
     const result = await createCategoryHandler(event, {} as never, () => undefined);
 
@@ -84,7 +85,7 @@ describe('createCategory handler', () => {
   });
 
   it('returns 400 for a payload that fails createCategoryInputSchema validation', async () => {
-    const event = buildAuthenticatedEvent('user-1', {
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', {
       body: JSON.stringify({ type: 'fixed' }), // missing required `name`
     });
 
