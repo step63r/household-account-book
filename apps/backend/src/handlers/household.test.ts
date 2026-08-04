@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { APIGatewayProxyEventV2, APIGatewayProxyEventV2WithJWTAuthorizer } from 'aws-lambda';
 import { handler as getMyHouseholdHandler } from './getMyHousehold';
+import { handler as updateHouseholdHandler } from './updateHousehold';
 import { handler as createInviteHandler } from './createInvite';
 import { handler as previewInviteHandler } from './previewInvite';
 import { handler as acceptInviteHandler } from './acceptInvite';
@@ -84,6 +85,34 @@ describe('getMyHousehold handler', () => {
     const result = await getMyHouseholdHandler(event, {} as never, () => undefined);
 
     expect(result).toMatchObject({ statusCode: 401 });
+  });
+});
+
+describe('updateHousehold handler', () => {
+  it('returns 401 when the JWT sub claim is missing', async () => {
+    const event = buildEvent({ body: JSON.stringify({ name: '新しい世帯名' }) });
+
+    const result = await updateHouseholdHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 401 });
+  });
+
+  it('returns 401 when the JWT email claim is missing', async () => {
+    const event = buildAuthenticatedEvent('user-1', undefined, {
+      body: JSON.stringify({ name: '新しい世帯名' }),
+    });
+
+    const result = await updateHouseholdHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 401 });
+  });
+
+  it('returns 400 for a missing request body', async () => {
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', { body: undefined });
+
+    const result = await updateHouseholdHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 400 });
   });
 });
 

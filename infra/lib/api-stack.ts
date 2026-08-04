@@ -206,6 +206,16 @@ function buildRoutes(props: ApiStackProps): RouteDef[] {
       dynamoActions: ['dynamodb:GetItem', 'dynamodb:Query', 'dynamodb:PutItem'],
     },
     {
+      method: apigwv2.HttpMethod.PATCH,
+      path: '/households/me',
+      handlerFile: 'updateHousehold',
+      // GetItem = USER PROFILE read (ensureProfileWithHousehold) + HOUSEHOLD PROFILE read (update
+      // target + getMyHousehold's re-fetch) + per-member USER PROFILE reads. PutItem =
+      // ensureProfileWithHousehold's lazy bootstrap + the household name update itself. Query =
+      // getMyHousehold's listMembers.
+      dynamoActions: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:Query'],
+    },
+    {
       method: apigwv2.HttpMethod.POST,
       path: '/households/me/invites',
       handlerFile: 'createInvite',

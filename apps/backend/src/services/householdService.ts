@@ -3,6 +3,7 @@ import {
   createInviteInputSchema,
   DEFAULT_HOUSEHOLD_NAME,
   INVITE_EXPIRY_DAYS,
+  updateHouseholdInputSchema,
   type Household,
   type HouseholdMemberSummary,
   type HouseholdSummary,
@@ -78,6 +79,22 @@ export async function getMyHousehold(
       (member): member is HouseholdMemberSummary => member !== undefined,
     ),
   };
+}
+
+/** PATCH /households/me 用。世帯名を更新する（更新専用メソッドは持たず、既存のputProfileで全置換する）。 */
+export async function updateHouseholdName(
+  householdRepository: HouseholdRepository,
+  householdId: string,
+  rawInput: unknown,
+): Promise<Household> {
+  const { name } = updateHouseholdInputSchema.parse(rawInput);
+  const household = await householdRepository.getProfile(householdId);
+  if (!household) {
+    throw new NotFoundError(`Household ${householdId} not found`);
+  }
+  const updated: Household = { ...household, name, updatedAt: new Date().toISOString() };
+  await householdRepository.putProfile(updated);
+  return updated;
 }
 
 export interface CreateInviteParams {

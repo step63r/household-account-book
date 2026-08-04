@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-/** 新規世帯作成時のデフォルト名。編集UIはv1では未提供（固定値）。 */
+/** 新規世帯作成時のデフォルト名。 */
 export const DEFAULT_HOUSEHOLD_NAME = 'マイ家計';
 
 /** 招待リンクの有効期限（日数）。 */
@@ -13,6 +13,12 @@ export const householdSchema = z.object({
   updatedAt: z.string().datetime(),
 });
 export type Household = z.infer<typeof householdSchema>;
+
+/** PATCH /households/me 入力用。世帯名の制約は householdSchema.name と同一にする。 */
+export const updateHouseholdInputSchema = z.object({
+  name: householdSchema.shape.name,
+});
+export type UpdateHouseholdInput = z.infer<typeof updateHouseholdInputSchema>;
 
 /**
  * 永続化用のメンバーシップ。role フィールドを持たない（世帯内は全員フラット権限）。

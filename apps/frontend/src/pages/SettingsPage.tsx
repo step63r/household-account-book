@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { ChangeEmailDialog } from '@/components/settings/ChangeEmailDialog';
 import { ChangePasswordDialog } from '@/components/settings/ChangePasswordDialog';
+import { EditHouseholdNameDialog } from '@/components/settings/EditHouseholdNameDialog';
 import { InviteMemberDialog } from '@/components/settings/InviteMemberDialog';
 import { requestAccountWithdrawal } from '@/lib/account';
 import { getCurrentSession, signOut } from '@/lib/auth';
@@ -174,7 +175,13 @@ export default function SettingsPage() {
             <>
               <div className="flex items-center justify-between border-b border-border py-2">
                 <span className="text-muted-foreground">世帯名</span>
-                <span className="font-medium">{householdQuery.data.name}</span>
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">{householdQuery.data.name}</span>
+                  <EditHouseholdNameDialog
+                    currentName={householdQuery.data.name}
+                    onSuccess={handleSuccess}
+                  />
+                </div>
               </div>
               <div>
                 <p className="mb-2 font-medium">メンバー</p>

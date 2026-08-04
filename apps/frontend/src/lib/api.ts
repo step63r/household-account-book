@@ -24,6 +24,7 @@
  *   POST   /users/me/consent
  *   GET    /users/me                                         src/lib/profile.ts（plan: 'free' | 'paid'）
  *   GET    /households/me                                    src/lib/household.ts
+ *   PATCH  /households/me           (body: { name })
  *   POST   /households/me/invites  (body: { email })
  *   GET    /invites/:token          （認証不要。skipAuth: true。招待リンクのプレビュー）
  *   POST   /invites/:token/accept

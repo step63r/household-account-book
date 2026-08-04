@@ -29,6 +29,10 @@ export function useHousehold() {
   });
 }
 
+export async function updateHouseholdName(name: string): Promise<HouseholdSummary> {
+  return apiFetch<HouseholdSummary>('/households/me', { method: 'PATCH', body: { name } });
+}
+
 export async function createInvite(email: string): Promise<{
   invitedEmail: string;
   expiresAt: string;
