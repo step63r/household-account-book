@@ -56,8 +56,19 @@ function Button({
       disabled={disabled || loading}
       {...props}
     >
-      {loading && <Loader2 className="animate-spin" aria-hidden="true" />}
-      {children}
+      {asChild ? (
+        // Slot (asChild) requires exactly one React element child - splitting the loading
+        // spinner and children into separate JSX expressions (even when `loading` is false)
+        // makes this a 2-element children array and throws "Slot failed to slot onto its
+        // children". asChild + loading together aren't supported; asChild always just forwards
+        // `children` untouched.
+        children
+      ) : (
+        <>
+          {loading && <Loader2 className="animate-spin" aria-hidden="true" />}
+          {children}
+        </>
+      )}
     </Comp>
   );
 }
