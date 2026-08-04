@@ -8,6 +8,7 @@
 
 - ユーザーに対する最終応答は必ず日本語で行うこと
 - gitのcommitおよびpushはユーザが行うので、いかなる場合もClaude Codeは実行しないこと
+- ファイルを新規作成・編集したら、ユーザーへの完了報告の前に必ずルートで `pnpm format` を実行してPrettierの差分を解消すること。このリポジトリにはpre-commitフック等のローカル強制手段が無く、GitHub Actions（`.github/workflows/ci.yml`の`pnpm format:check`）でのみ検出されるため、Claude Codeが編集直後にフォーマットしないとほぼ毎回CIの`format:check`が失敗する（実際に発生した事象。2026-08-04、`EditHouseholdNameDialog.tsx`のJSX折り返しがPrettier規約と不一致でCI失敗）
 
 ## 技術スタック
 

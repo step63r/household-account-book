@@ -74,7 +74,9 @@ export function EditHouseholdNameDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>世帯名を変更</DialogTitle>
-          <DialogDescription>この世帯を共有するメンバー全員に表示される名前です。</DialogDescription>
+          <DialogDescription>
+            この世帯を共有するメンバー全員に表示される名前です。
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
