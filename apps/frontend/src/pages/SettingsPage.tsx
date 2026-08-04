@@ -166,9 +166,7 @@ export default function SettingsPage() {
           <CardDescription>家族と家計データ（取引・費目・予算）を共有します</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 text-sm">
-          {householdQuery.isLoading && (
-            <p className="text-muted-foreground">読み込み中...</p>
-          )}
+          {householdQuery.isLoading && <p className="text-muted-foreground">読み込み中...</p>}
           {householdQuery.isError && (
             <p className="text-destructive">世帯情報の取得に失敗しました</p>
           )}

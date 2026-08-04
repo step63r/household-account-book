@@ -219,18 +219,12 @@ function AcceptInviteConfirm({
         <Users className="mb-2 size-8 text-primary" aria-hidden="true" />
         <CardTitle>{preview.householdName} に参加しますか？</CardTitle>
         <CardDescription>
-          {preview.invitedByEmail} さんの世帯に参加すると、取引・費目・予算のデータが
-          共有されます。
+          {preview.invitedByEmail} さんの世帯に参加すると、取引・費目・予算のデータが 共有されます。
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button
-          type="button"
-          disabled={isSubmitting}
-          loading={isSubmitting}
-          onClick={handleAccept}
-        >
+        <Button type="button" disabled={isSubmitting} loading={isSubmitting} onClick={handleAccept}>
           参加する
         </Button>
         <BackToLoginLink />
