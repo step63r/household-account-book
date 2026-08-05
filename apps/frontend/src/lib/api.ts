@@ -31,7 +31,7 @@
  *   POST   /households/me/leave
  *
  * ログイン/サインアップはこの API を経由しない。CLAUDE.md の設計どおり Cognito User Pool
- * に対して直接（Cognito Hosted UI ではなく `aws-amplify`（Auth）経由で）認証する
+ * に対して直接（Cognito Hosted UI ではなく `amazon-cognito-identity-js` SDK 経由で）認証する
  * （`src/lib/auth.ts`）。退会だけは DynamoDB 側の状態変更が必要なため例外的にこの API を叩く
  * （`src/lib/account.ts`。`auth.ts` に置くと `getAuthToken` がその `auth.ts` を参照する関係で
  * 循環importになるため分離している）。
@@ -60,7 +60,7 @@ export class ApiError extends Error {
 export async function getAuthToken(): Promise<string | null> {
   const session = await getCurrentSession();
   if (!session) return null;
-  return session.idToken;
+  return session.getIdToken().getJwtToken();
 }
 
 export type ApiFetchOptions = Omit<RequestInit, 'body'> & {

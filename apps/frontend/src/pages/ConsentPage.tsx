@@ -51,8 +51,8 @@ export default function ConsentPage() {
     }
   };
 
-  const handleLogout = async () => {
-    await signOut();
+  const handleLogout = () => {
+    signOut();
     navigate('/login', { replace: true });
   };
 

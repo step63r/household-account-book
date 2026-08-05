@@ -103,9 +103,10 @@ function InviteAction({
           setSessionState({ status: 'unauthenticated' });
           return;
         }
+        const claim = session.getIdToken().payload.email;
         setSessionState({
           status: 'authenticated',
-          email: session.email,
+          email: typeof claim === 'string' ? claim : null,
         });
       })
       .catch(() => {
@@ -235,8 +236,8 @@ function AcceptInviteConfirm({
 function LogoutAndRelogin({ token }: { token: string }) {
   const navigate = useNavigate();
 
-  async function handleLogout() {
-    await signOut();
+  function handleLogout() {
+    signOut();
     const joinPath = `/join-household?token=${encodeURIComponent(token)}`;
     navigate(`/login?${new URLSearchParams({ redirect: joinPath }).toString()}`, {
       replace: true,

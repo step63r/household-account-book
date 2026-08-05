@@ -55,7 +55,8 @@ export default function SettingsPage() {
     let cancelled = false;
     getCurrentSession().then((session) => {
       if (cancelled || !session) return;
-      if (session.email) setEmail(session.email);
+      const claim = session.getIdToken().payload.email;
+      if (typeof claim === 'string') setEmail(claim);
     });
     return () => {
       cancelled = true;
@@ -68,7 +69,7 @@ export default function SettingsPage() {
     try {
       await requestAccountWithdrawal();
       // 退会（論理削除）を受け付けたら、このセッションは以後使えないためログアウトする。
-      await signOut();
+      signOut();
       navigate('/login', { replace: true });
     } catch (e) {
       setWithdrawalError(e instanceof Error ? e.message : '退会処理に失敗しました');
@@ -76,8 +77,8 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleSignOut() {
-    await signOut();
+  function handleSignOut() {
+    signOut();
     navigate('/login', { replace: true });
   }
 

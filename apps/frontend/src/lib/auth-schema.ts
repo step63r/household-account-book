@@ -44,11 +44,11 @@ export const confirmSignUpSchema = z.object({
 });
 export type ConfirmSignUpFormValues = z.infer<typeof confirmSignUpSchema>;
 
-/** MFA（TOTP／メール共通）の6桁コード入力用スキーマ。MFA登録確認・ログイン時のMFAチャレンジで共用する。 */
-export const mfaCodeSchema = z.object({
+/** TOTP（認証アプリ）の6桁コード入力用スキーマ。MFA登録確認・ログイン時のMFAチャレンジで共用する。 */
+export const totpCodeSchema = z.object({
   code: z.string().regex(/^\d{6}$/, '6桁の数字を入力してください'),
 });
-export type MfaCodeFormValues = z.infer<typeof mfaCodeSchema>;
+export type TotpCodeFormValues = z.infer<typeof totpCodeSchema>;
 
 /** 設定画面のメールアドレス変更フォーム用スキーマ。 */
 export const changeEmailSchema = z.object({

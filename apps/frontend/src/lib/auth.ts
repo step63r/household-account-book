@@ -1,13 +1,9 @@
 /**
  * 認証まわり（Amazon Cognito User Pool 連携）。
  *
- * AWS公式の `aws-amplify`（Authカテゴリ）を使い、Cognito User Poolに対して直接
- * 認証する（Cognito Hosted UIは使わない）。バックエンドには `/auth/*` エンドポイントは
- * 存在しない設計（CLAUDE.md参照）。
- *
- * 以前は `amazon-cognito-identity-js` を直接使っていたが、CognitoのメールMFA（`EMAIL_OTP`
- * チャレンジ）にそのライブラリが対応していない（型・実行時ロジックともに存在せず、飛んで
- * くると誤動作する）ため `aws-amplify` に移行した。
+ * `amazon-cognito-identity-js` を使い、Cognito User Pool に対して SDK 経由で直接
+ * 認証する（Cognito Hosted UI は使わない）。バックエンドには `/auth/*` エンドポイントは
+ * 存在しない設計（CLAUDE.md 参照）。
  *
  * User Pool ID / アプリクライアント ID は Vite 環境変数から読む
  * （`VITE_COGNITO_USER_POOL_ID` / `VITE_COGNITO_CLIENT_ID`。infra の
@@ -16,29 +12,20 @@
  * ではなく実際に呼び出された時点で検証し、フォームの送信エラーとして表示できるようにする
  * （画面描画自体をクラッシュさせない）。
  *
- * トークンの保存・更新は `aws-amplify` に任せる: `Amplify.configure` 後に `signIn` 等が
- * 成功すると、SDK が自身の判断で `window.localStorage` にトークンを保存する。以後は
- * `fetchAuthSession()` を呼べば期限切れ時はリフレッシュトークンで自動的に再取得してくれる。
+ * トークンの保存・更新は `amazon-cognito-identity-js` に任せる: `CognitoUserPool.signUp` /
+ * `CognitoUser.authenticateUser` が成功すると、SDK が自身の判断で `window.localStorage`
+ * （キーは `<clientId>.<username>...` 形式）にトークンを保存する。以後は
+ * `CognitoUserPool.getCurrentUser()` でその最新ユーザーを取得し、`CognitoUser.getSession()`
+ * を呼べば期限切れ時はリフレッシュトークンで自動的に再取得してくれる。
+ * `getAuthToken()`（`src/lib/api.ts`）はこの仕組みの上で ID トークンを取り出すだけにしている。
  */
-import { Amplify } from 'aws-amplify';
 import {
-  confirmResetPassword,
-  confirmSignIn,
-  confirmSignUp as amplifyConfirmSignUp,
-  confirmUserAttribute,
-  fetchAuthSession,
-  fetchMFAPreference,
-  resetPassword,
-  setUpTOTP,
-  signIn,
-  signOut as amplifySignOut,
-  signUp,
-  updateMFAPreference,
-  updatePassword,
-  updateUserAttributes,
-  verifyTOTPSetup,
-  type SignInOutput,
-} from 'aws-amplify/auth';
+  AuthenticationDetails,
+  CognitoUser,
+  CognitoUserAttribute,
+  CognitoUserPool,
+  type CognitoUserSession,
+} from 'amazon-cognito-identity-js';
 
 export type EmailPasswordCredentials = {
   email: string;
@@ -50,39 +37,48 @@ export type ConfirmSignUpInput = {
   code: string;
 };
 
-let configured = false;
+type AuthenticatedUser = {
+  user: CognitoUser;
+  session: CognitoUserSession;
+};
+
+let cachedUserPool: CognitoUserPool | null = null;
 
 /**
- * Amplifyの設定（`Amplify.configure`）を初回呼び出し時にのみ行う。環境変数が未設定の場合は
- * ここで分かりやすいエラーを投げる（呼び出し元は全て async 関数なので、呼び出し側の catch で
- * フォームのエラーメッセージとして表示される）。
+ * Cognito User Pool クライアントを取得する。環境変数が未設定の場合はここで分かりやすい
+ * エラーを投げる（呼び出し元は全て async 関数なので、呼び出し側の catch でフォームの
+ * エラーメッセージとして表示される）。
  */
-function ensureAmplifyConfigured(): void {
-  if (configured) return;
+function getUserPool(): CognitoUserPool {
+  if (cachedUserPool) return cachedUserPool;
 
   const userPoolId = import.meta.env.VITE_COGNITO_USER_POOL_ID;
-  const userPoolClientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
-  if (!userPoolId || !userPoolClientId) {
+  const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
+  if (!userPoolId || !clientId) {
     throw new Error(
       '認証設定が未構成です（VITE_COGNITO_USER_POOL_ID / VITE_COGNITO_CLIENT_ID を設定してください）',
     );
   }
 
-  Amplify.configure({
-    Auth: {
-      Cognito: {
-        userPoolId,
-        userPoolClientId,
-        loginWith: { email: true },
-      },
-    },
-  });
-  configured = true;
+  cachedUserPool = new CognitoUserPool({ UserPoolId: userPoolId, ClientId: clientId });
+  return cachedUserPool;
 }
 
-/** Amplifyの例外オブジェクト（`AuthError`、`message`を持つ）から表示用メッセージを取り出す。 */
+function getCognitoUser(email: string): CognitoUser {
+  return new CognitoUser({ Username: email, Pool: getUserPool() });
+}
+
+/** Cognito の例外オブジェクト（`{ code, message, name }` 形式）から表示用メッセージを取り出す。 */
 function describeCognitoError(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
+  if (
+    error &&
+    typeof error === 'object' &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  ) {
+    return (error as { message: string }).message;
+  }
   return fallback;
 }
 
@@ -91,115 +87,95 @@ export async function signUpWithEmailPassword({
   email,
   password,
 }: EmailPasswordCredentials): Promise<void> {
-  ensureAmplifyConfigured();
-  try {
-    await signUp({ username: email, password, options: { userAttributes: { email } } });
-  } catch (err) {
-    throw new Error(describeCognitoError(err, '新規登録に失敗しました'));
-  }
+  const pool = getUserPool();
+  const attributeList = [new CognitoUserAttribute({ Name: 'email', Value: email })];
+
+  await new Promise<void>((resolve, reject) => {
+    pool.signUp(email, password, attributeList, [], (err) => {
+      if (err) {
+        reject(new Error(describeCognitoError(err, '新規登録に失敗しました')));
+        return;
+      }
+      resolve();
+    });
+  });
 }
 
 /** サインアップ時にメールで届く確認コードを検証する。成功するとログイン可能になる。 */
 export async function confirmSignUp({ email, code }: ConfirmSignUpInput): Promise<void> {
-  ensureAmplifyConfigured();
-  try {
-    await amplifyConfirmSignUp({ username: email, confirmationCode: code });
-  } catch (err) {
-    throw new Error(describeCognitoError(err, '確認コードの検証に失敗しました'));
-  }
+  const user = getCognitoUser(email);
+
+  await new Promise<void>((resolve, reject) => {
+    user.confirmRegistration(code, true, (err) => {
+      if (err) {
+        reject(new Error(describeCognitoError(err, '確認コードの検証に失敗しました')));
+        return;
+      }
+      resolve();
+    });
+  });
 }
 
 export type SignInResult =
   | { status: 'success' }
-  | {
-      status: 'mfaCodeRequired';
-      method: 'TOTP' | 'EMAIL';
-      confirmCode: (code: string) => Promise<SignInResult>;
-    }
-  | {
-      status: 'mfaSelectionRequired';
-      options: ('TOTP' | 'EMAIL')[];
-      selectMethod: (method: 'TOTP' | 'EMAIL') => Promise<SignInResult>;
-    };
-
-/** `signIn`/`confirmSignIn` の `nextStep` を、このアプリで扱う `SignInResult` に変換する。 */
-function interpretSignInResult(result: SignInOutput): SignInResult {
-  const { nextStep } = result;
-  switch (nextStep.signInStep) {
-    case 'DONE':
-      return { status: 'success' };
-    case 'CONFIRM_SIGN_IN_WITH_TOTP_CODE':
-      return {
-        status: 'mfaCodeRequired',
-        method: 'TOTP',
-        confirmCode: (code) => confirmMfaChallenge(code, '認証コードが正しくありません'),
-      };
-    case 'CONFIRM_SIGN_IN_WITH_EMAIL_CODE':
-      return {
-        status: 'mfaCodeRequired',
-        method: 'EMAIL',
-        confirmCode: (code) => confirmMfaChallenge(code, '認証コードが正しくありません'),
-      };
-    case 'CONTINUE_SIGN_IN_WITH_MFA_SELECTION': {
-      // 設計上は常にTOTP/メールのどちらか一方のみを有効化するため通常は発生しないが、
-      // Cognito側の状態が想定外（例: 手動操作で両方有効）でも落ちないよう防御的に扱う。
-      const options = (nextStep.allowedMFATypes ?? []).filter(
-        (t): t is 'TOTP' | 'EMAIL' => t === 'TOTP' || t === 'EMAIL',
-      );
-      return {
-        status: 'mfaSelectionRequired',
-        options,
-        selectMethod: (method) => confirmMfaChallenge(method, 'MFA方式の選択に失敗しました'),
-      };
-    }
-    default:
-      // 新規パスワード必須・サインアップ未確認など、現在のUIフローでは到達しない想定の状態。
-      throw new Error('ログインに失敗しました（想定外の状態です）');
-  }
-}
-
-async function confirmMfaChallenge(
-  challengeResponse: string,
-  errorFallback: string,
-): Promise<SignInResult> {
-  let result: SignInOutput;
-  try {
-    result = await confirmSignIn({ challengeResponse });
-  } catch (err) {
-    throw new Error(describeCognitoError(err, errorFallback));
-  }
-  return interpretSignInResult(result);
-}
+  | { status: 'mfaRequired'; confirmMfaCode: (code: string) => Promise<void> };
 
 /**
- * Cognito `signIn`（SRP認証）。成功するとSDKがセッションを永続化し、`getAuthToken`から参照
- * できるようになる。TOTP/メールMFAが有効なユーザーの場合は`mfaCodeRequired`を返し、
- * 呼び出し元に6桁コードの入力を求めさせる。
+ * Cognito `authenticateUser`（SRP 認証）。成功すると SDK がセッションを永続化し、`getAuthToken` から参照できるようになる。
+ * MFA（TOTP）が有効なユーザーの場合は `totpRequired` チャレンジが飛んでくるため、`mfaRequired` を返し
+ * 呼び出し元に6桁コードの入力を求めさせる。`CognitoUser` インスタンス自体は外に出さず、
+ * 同じインスタンスに対して `sendMFACode` を呼ぶクロージャ（`confirmMfaCode`）として閉じ込める。
  */
 export async function signInWithEmailPassword({
   email,
   password,
 }: EmailPasswordCredentials): Promise<SignInResult> {
-  ensureAmplifyConfigured();
-  try {
-    const result = await signIn({ username: email, password });
-    return interpretSignInResult(result);
-  } catch (err) {
-    throw new Error(describeCognitoError(err, 'ログインに失敗しました'));
-  }
+  const user = getCognitoUser(email);
+  const authenticationDetails = new AuthenticationDetails({ Username: email, Password: password });
+
+  return new Promise<SignInResult>((resolve, reject) => {
+    user.authenticateUser(authenticationDetails, {
+      onSuccess: () => resolve({ status: 'success' }),
+      onFailure: (err) => reject(new Error(describeCognitoError(err, 'ログインに失敗しました'))),
+      newPasswordRequired: () => {
+        reject(new Error('初回パスワードの変更が必要です。管理者にお問い合わせください。'));
+      },
+      totpRequired: () => {
+        resolve({
+          status: 'mfaRequired',
+          confirmMfaCode: (code: string) =>
+            new Promise<void>((res, rej) => {
+              user.sendMFACode(
+                code,
+                {
+                  onSuccess: () => res(),
+                  onFailure: (err) =>
+                    rej(new Error(describeCognitoError(err, '認証コードが正しくありません'))),
+                },
+                'SOFTWARE_TOKEN_MFA',
+              );
+            }),
+        });
+      },
+    });
+  });
 }
 
 /**
  * パスワード再設定（忘れた場合）の受付。Cognito がメールで確認コードを送信する
  * （実際にはユーザー向けにはリンク形式に書き換える CustomMessage Lambda トリガーを別途設定する想定）。
+ * 未ログイン状態で呼ばれるため `getAuthenticatedUser` は使わず `getCognitoUser` を直接使う。
  */
 export async function forgotPassword(email: string): Promise<void> {
-  ensureAmplifyConfigured();
-  try {
-    await resetPassword({ username: email });
-  } catch (err) {
-    throw new Error(describeCognitoError(err, 'パスワード再設定の受付に失敗しました'));
-  }
+  const user = getCognitoUser(email);
+
+  await new Promise<void>((resolve, reject) => {
+    user.forgotPassword({
+      onSuccess: () => resolve(),
+      onFailure: (err) =>
+        reject(new Error(describeCognitoError(err, 'パスワード再設定の受付に失敗しました'))),
+    });
+  });
 }
 
 export type ConfirmForgotPasswordInput = {
@@ -214,50 +190,60 @@ export async function confirmForgotPassword({
   code,
   newPassword,
 }: ConfirmForgotPasswordInput): Promise<void> {
-  ensureAmplifyConfigured();
-  try {
-    await confirmResetPassword({ username: email, confirmationCode: code, newPassword });
-  } catch (err) {
-    throw new Error(describeCognitoError(err, 'パスワードの再設定に失敗しました'));
-  }
+  const user = getCognitoUser(email);
+
+  await new Promise<void>((resolve, reject) => {
+    user.confirmPassword(code, newPassword, {
+      onSuccess: () => resolve(),
+      onFailure: (err) =>
+        reject(new Error(describeCognitoError(err, 'パスワードの再設定に失敗しました'))),
+    });
+  });
 }
 
-/** ログアウト。ローカルに保存されたセッション情報を破棄する。 */
-export async function signOut(): Promise<void> {
+/** ログアウト。ローカルに保存されたセッション情報を破棄する（Cognito 側の失効はしない `signOut`）。 */
+export function signOut(): void {
   try {
-    ensureAmplifyConfigured();
-    await amplifySignOut();
+    getUserPool().getCurrentUser()?.signOut();
   } catch {
-    // 環境変数未設定など、そもそもログインしようがない状態や、サインアウト自体が失敗した場合も
-    // 何もしない（呼び出し元は必ずログイン画面へ遷移するだけなので、失敗を伝える意味が薄い）
+    // 環境変数未設定など、そもそもログインしようがない状態では何もしない
   }
 }
-
-export type AppSession = { idToken: string; email: string | null } | null;
 
 /**
- * 現在の認証セッションを取得する。ログインしていない・環境変数未設定・トークン失効かつ
- * リフレッシュ不可の場合は `null` を返す（例外は投げない）。ルート保護や `getAuthToken` から使う。
+ * 現在ログイン中の `CognitoUser` を、有効なセッションを持つ状態で取得する。
+ * `updateAttributes`/`verifyAttribute` はセッション読み込み前に呼ぶと失敗するため、
+ * 呼び出し前に必ずこれを経由する。未ログイン等の場合は `null`（例外は投げない）。
  */
-export async function getCurrentSession(): Promise<AppSession> {
+async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> {
+  let pool: CognitoUserPool;
   try {
-    ensureAmplifyConfigured();
+    pool = getUserPool();
   } catch {
     return null;
   }
 
-  try {
-    const session = await fetchAuthSession();
-    const idToken = session.tokens?.idToken;
-    if (!idToken) return null;
-    const emailClaim = idToken.payload.email;
-    return {
-      idToken: idToken.toString(),
-      email: typeof emailClaim === 'string' ? emailClaim : null,
-    };
-  } catch {
-    return null;
-  }
+  const user = pool.getCurrentUser();
+  if (!user) return null;
+
+  return new Promise((resolve) => {
+    user.getSession((err: Error | null, session: CognitoUserSession | null) => {
+      if (err || !session || !session.isValid()) {
+        resolve(null);
+        return;
+      }
+      resolve({ user, session });
+    });
+  });
+}
+
+/**
+ * 現在の Cognito セッションを取得する。ログインしていない・環境変数未設定・トークン失効かつ
+ * リフレッシュ不可の場合は `null` を返す（例外は投げない）。ルート保護や `getAuthToken` から使う。
+ */
+export async function getCurrentSession(): Promise<CognitoUserSession | null> {
+  const authenticated = await getAuthenticatedUser();
+  return authenticated?.session ?? null;
 }
 
 /**
@@ -266,88 +252,136 @@ export async function getCurrentSession(): Promise<AppSession> {
  * （User Pool の `keepOriginal.email` 設定による。infra/lib/auth-stack.ts 参照）。
  */
 export async function requestEmailChange(newEmail: string): Promise<void> {
-  ensureAmplifyConfigured();
-  try {
-    await updateUserAttributes({ userAttributes: { email: newEmail } });
-  } catch (err) {
-    throw new Error(describeCognitoError(err, 'メールアドレスの変更に失敗しました'));
+  const authenticated = await getAuthenticatedUser();
+  if (!authenticated) {
+    throw new Error('ログインしていません');
   }
+  const attribute = new CognitoUserAttribute({ Name: 'email', Value: newEmail });
+
+  await new Promise<void>((resolve, reject) => {
+    authenticated.user.updateAttributes([attribute], (err) => {
+      if (err) {
+        reject(new Error(describeCognitoError(err, 'メールアドレスの変更に失敗しました')));
+        return;
+      }
+      resolve();
+    });
+  });
 }
 
 /** `requestEmailChange` で新アドレスに送られた確認コードを検証し、メールアドレス変更を完了する。 */
 export async function confirmEmailChange(code: string): Promise<void> {
-  ensureAmplifyConfigured();
-  try {
-    await confirmUserAttribute({ userAttributeKey: 'email', confirmationCode: code });
-  } catch (err) {
-    throw new Error(describeCognitoError(err, '確認コードの検証に失敗しました'));
+  const authenticated = await getAuthenticatedUser();
+  if (!authenticated) {
+    throw new Error('ログインしていません');
   }
+
+  await new Promise<void>((resolve, reject) => {
+    authenticated.user.verifyAttribute('email', code, {
+      onSuccess: () => resolve(),
+      onFailure: (err) =>
+        reject(new Error(describeCognitoError(err, '確認コードの検証に失敗しました'))),
+    });
+  });
 }
 
 /** ログイン中ユーザーのパスワードを変更する。1ステップで完結し、成功後も既存セッションは失効しない。 */
 export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
-  ensureAmplifyConfigured();
-  try {
-    await updatePassword({ oldPassword, newPassword });
-  } catch (err) {
-    throw new Error(describeCognitoError(err, 'パスワードの変更に失敗しました'));
+  const authenticated = await getAuthenticatedUser();
+  if (!authenticated) {
+    throw new Error('ログインしていません');
   }
+
+  await new Promise<void>((resolve, reject) => {
+    authenticated.user.changePassword(oldPassword, newPassword, (err) => {
+      if (err) {
+        reject(new Error(describeCognitoError(err, 'パスワードの変更に失敗しました')));
+        return;
+      }
+      resolve();
+    });
+  });
 }
 
-export type MfaMethod = 'NONE' | 'TOTP' | 'EMAIL';
-
-/** ログイン中ユーザーが現在有効化しているMFA方式を返す。 */
-export async function getMfaStatus(): Promise<MfaMethod> {
-  ensureAmplifyConfigured();
-  const { enabled, preferred } = await fetchMFAPreference();
-  const active = preferred ?? enabled?.[0];
-  return active === 'TOTP' || active === 'EMAIL' ? active : 'NONE';
-}
-
-/** TOTP登録を開始し、認証アプリでQRコード（or 手入力）に使うURI・シークレットを発行する。 */
-export async function startTotpEnrollment(email: string): Promise<{ uri: string; secret: string }> {
-  ensureAmplifyConfigured();
-  const details = await setUpTOTP();
-  return {
-    uri: details.getSetupUri('家計簿アプリ', email).toString(),
-    secret: details.sharedSecret,
-  };
-}
-
-/** `startTotpEnrollment` で発行したシークレットに対応する6桁コードを検証し、TOTPをMFAとして有効化する。 */
-export async function confirmTotpEnrollment(code: string): Promise<void> {
-  ensureAmplifyConfigured();
-  try {
-    await verifyTOTPSetup({ code });
-  } catch (err) {
-    throw new Error(describeCognitoError(err, '認証コードの検証に失敗しました'));
+/** ログイン中ユーザーがTOTP（認証アプリ）MFAを既に有効化しているかを返す。 */
+export async function getMfaStatus(): Promise<boolean> {
+  const authenticated = await getAuthenticatedUser();
+  if (!authenticated) {
+    throw new Error('ログインしていません');
   }
-  try {
-    await updateMFAPreference({ totp: 'PREFERRED', email: 'DISABLED', sms: 'DISABLED' });
-  } catch (err) {
-    throw new Error(describeCognitoError(err, 'MFAの有効化に失敗しました'));
-  }
+
+  return new Promise((resolve, reject) => {
+    authenticated.user.getUserData((err, data) => {
+      if (err || !data) {
+        reject(new Error(describeCognitoError(err, 'MFA設定の取得に失敗しました')));
+        return;
+      }
+      resolve(data.UserMFASettingList?.includes('SOFTWARE_TOKEN_MFA') ?? false);
+    });
+  });
 }
 
-/**
- * メールMFAを有効化する。メールアドレスは既にサインアップ時に検証済みの属性のため、
- * TOTPと異なり追加のコード確認ステップは不要（コード確認が必要になるのは次回ログイン時）。
- */
-export async function enableEmailMfa(): Promise<void> {
-  ensureAmplifyConfigured();
-  try {
-    await updateMFAPreference({ email: 'PREFERRED', totp: 'DISABLED', sms: 'DISABLED' });
-  } catch (err) {
-    throw new Error(describeCognitoError(err, 'MFAの有効化に失敗しました'));
+/** TOTP登録を開始し、認証アプリでQRコード（or 手入力）に使うシークレットコードを発行する。 */
+export async function startMfaEnrollment(): Promise<{ secretCode: string }> {
+  const authenticated = await getAuthenticatedUser();
+  if (!authenticated) {
+    throw new Error('ログインしていません');
   }
+
+  return new Promise((resolve, reject) => {
+    authenticated.user.associateSoftwareToken({
+      associateSecretCode: (secretCode) => resolve({ secretCode }),
+      onFailure: (err) =>
+        reject(new Error(describeCognitoError(err, 'MFA設定の開始に失敗しました'))),
+    });
+  });
 }
 
-/** MFAを無効化する（TOTP・メールいずれも）。 */
+/** `startMfaEnrollment` で発行したシークレットに対応する6桁コードを検証し、TOTP MFAを有効化する。 */
+export async function confirmMfaEnrollment(code: string): Promise<void> {
+  const authenticated = await getAuthenticatedUser();
+  if (!authenticated) {
+    throw new Error('ログインしていません');
+  }
+  const { user } = authenticated;
+
+  await new Promise<void>((resolve, reject) => {
+    user.verifySoftwareToken(code, 'Authenticator App', {
+      onSuccess: () => resolve(),
+      onFailure: (err) =>
+        reject(new Error(describeCognitoError(err, '認証コードの検証に失敗しました'))),
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    user.setUserMfaPreference(null, { PreferredMfa: true, Enabled: true }, (err) => {
+      if (err) {
+        reject(new Error(describeCognitoError(err, 'MFAの有効化に失敗しました')));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+/** TOTP MFAを無効化する。 */
 export async function disableMfa(): Promise<void> {
-  ensureAmplifyConfigured();
-  try {
-    await updateMFAPreference({ totp: 'DISABLED', email: 'DISABLED', sms: 'DISABLED' });
-  } catch (err) {
-    throw new Error(describeCognitoError(err, 'MFAの無効化に失敗しました'));
+  const authenticated = await getAuthenticatedUser();
+  if (!authenticated) {
+    throw new Error('ログインしていません');
   }
+
+  await new Promise<void>((resolve, reject) => {
+    authenticated.user.setUserMfaPreference(
+      null,
+      { PreferredMfa: false, Enabled: false },
+      (err) => {
+        if (err) {
+          reject(new Error(describeCognitoError(err, 'MFAの無効化に失敗しました')));
+          return;
+        }
+        resolve();
+      },
+    );
+  });
 }
