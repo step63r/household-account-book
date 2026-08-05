@@ -116,20 +116,46 @@ export async function confirmSignUp({ email, code }: ConfirmSignUpInput): Promis
   });
 }
 
-/** Cognito `authenticateUser`（SRP 認証）。成功すると SDK がセッションを永続化し、`getAuthToken` から参照できるようになる。 */
+export type SignInResult =
+  | { status: 'success' }
+  | { status: 'mfaRequired'; confirmMfaCode: (code: string) => Promise<void> };
+
+/**
+ * Cognito `authenticateUser`（SRP 認証）。成功すると SDK がセッションを永続化し、`getAuthToken` から参照できるようになる。
+ * MFA（TOTP）が有効なユーザーの場合は `totpRequired` チャレンジが飛んでくるため、`mfaRequired` を返し
+ * 呼び出し元に6桁コードの入力を求めさせる。`CognitoUser` インスタンス自体は外に出さず、
+ * 同じインスタンスに対して `sendMFACode` を呼ぶクロージャ（`confirmMfaCode`）として閉じ込める。
+ */
 export async function signInWithEmailPassword({
   email,
   password,
-}: EmailPasswordCredentials): Promise<void> {
+}: EmailPasswordCredentials): Promise<SignInResult> {
   const user = getCognitoUser(email);
   const authenticationDetails = new AuthenticationDetails({ Username: email, Password: password });
 
-  await new Promise<void>((resolve, reject) => {
+  return new Promise<SignInResult>((resolve, reject) => {
     user.authenticateUser(authenticationDetails, {
-      onSuccess: () => resolve(),
+      onSuccess: () => resolve({ status: 'success' }),
       onFailure: (err) => reject(new Error(describeCognitoError(err, 'ログインに失敗しました'))),
       newPasswordRequired: () => {
         reject(new Error('初回パスワードの変更が必要です。管理者にお問い合わせください。'));
+      },
+      totpRequired: () => {
+        resolve({
+          status: 'mfaRequired',
+          confirmMfaCode: (code: string) =>
+            new Promise<void>((res, rej) => {
+              user.sendMFACode(
+                code,
+                {
+                  onSuccess: () => res(),
+                  onFailure: (err) =>
+                    rej(new Error(describeCognitoError(err, '認証コードが正しくありません'))),
+                },
+                'SOFTWARE_TOKEN_MFA',
+              );
+            }),
+        });
       },
     });
   });
@@ -274,5 +300,88 @@ export async function changePassword(oldPassword: string, newPassword: string): 
       }
       resolve();
     });
+  });
+}
+
+/** ログイン中ユーザーがTOTP（認証アプリ）MFAを既に有効化しているかを返す。 */
+export async function getMfaStatus(): Promise<boolean> {
+  const authenticated = await getAuthenticatedUser();
+  if (!authenticated) {
+    throw new Error('ログインしていません');
+  }
+
+  return new Promise((resolve, reject) => {
+    authenticated.user.getUserData((err, data) => {
+      if (err || !data) {
+        reject(new Error(describeCognitoError(err, 'MFA設定の取得に失敗しました')));
+        return;
+      }
+      resolve(data.UserMFASettingList?.includes('SOFTWARE_TOKEN_MFA') ?? false);
+    });
+  });
+}
+
+/** TOTP登録を開始し、認証アプリでQRコード（or 手入力）に使うシークレットコードを発行する。 */
+export async function startMfaEnrollment(): Promise<{ secretCode: string }> {
+  const authenticated = await getAuthenticatedUser();
+  if (!authenticated) {
+    throw new Error('ログインしていません');
+  }
+
+  return new Promise((resolve, reject) => {
+    authenticated.user.associateSoftwareToken({
+      associateSecretCode: (secretCode) => resolve({ secretCode }),
+      onFailure: (err) =>
+        reject(new Error(describeCognitoError(err, 'MFA設定の開始に失敗しました'))),
+    });
+  });
+}
+
+/** `startMfaEnrollment` で発行したシークレットに対応する6桁コードを検証し、TOTP MFAを有効化する。 */
+export async function confirmMfaEnrollment(code: string): Promise<void> {
+  const authenticated = await getAuthenticatedUser();
+  if (!authenticated) {
+    throw new Error('ログインしていません');
+  }
+  const { user } = authenticated;
+
+  await new Promise<void>((resolve, reject) => {
+    user.verifySoftwareToken(code, 'Authenticator App', {
+      onSuccess: () => resolve(),
+      onFailure: (err) =>
+        reject(new Error(describeCognitoError(err, '認証コードの検証に失敗しました'))),
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    user.setUserMfaPreference(null, { PreferredMfa: true, Enabled: true }, (err) => {
+      if (err) {
+        reject(new Error(describeCognitoError(err, 'MFAの有効化に失敗しました')));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+/** TOTP MFAを無効化する。 */
+export async function disableMfa(): Promise<void> {
+  const authenticated = await getAuthenticatedUser();
+  if (!authenticated) {
+    throw new Error('ログインしていません');
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    authenticated.user.setUserMfaPreference(
+      null,
+      { PreferredMfa: false, Enabled: false },
+      (err) => {
+        if (err) {
+          reject(new Error(describeCognitoError(err, 'MFAの無効化に失敗しました')));
+          return;
+        }
+        resolve();
+      },
+    );
   });
 }

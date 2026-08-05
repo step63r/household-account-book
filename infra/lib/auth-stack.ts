@@ -28,10 +28,9 @@ export interface AuthStackProps extends cdk.StackProps {
  *   means external IdPs (Google/Apple/etc.) can be added later as `UserPoolIdentityProvider`
  *   constructs and appended to the client's `supportedIdentityProviders` - additive, not a
  *   pool replacement.
- * - `mfa: Mfa.OPTIONAL` with no `mfaSecondFactor` configured leaves MFA off by default today
- *   (users aren't prompted) while keeping `MfaConfiguration` on the pool already set to a value
- *   CloudFormation can update in place later (flipping to `OFF`->`OPTIONAL` is a replacement in
- *   some SDKs, but `OPTIONAL`->`OPTIONAL` with an added `mfaSecondFactor` is not).
+ * - `mfa: Mfa.OPTIONAL` with `mfaSecondFactor: { otp: true, sms: false }` lets users opt into
+ *   TOTP (authenticator app, e.g. Microsoft Authenticator) MFA from the Settings screen, without
+ *   requiring it pool-wide. SMS is deliberately not enabled (no SNS/origination number setup).
  * - `keepOriginal: { email: true }` requires verification of a new email address (a code sent to
  *   it) before the attribute actually changes, instead of updating immediately - this backs the
  *   Settings screen's email-change flow, which reuses the same OTP-confirmation UX as sign-up.
@@ -67,8 +66,7 @@ export class AuthStack extends cdk.Stack {
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
       mfa: cognito.Mfa.OPTIONAL,
-      // No mfaSecondFactor configured, so no user is actually prompted for MFA today - this
-      // just pre-positions the pool so turning MFA on later is a config flip, not a rebuild.
+      mfaSecondFactor: { otp: true, sms: false },
       // Prod holds real user accounts; dev doesn't need the same blast-radius protection.
       removalPolicy: props.stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
       email: cognito.UserPoolEmail.withSES({
