@@ -82,7 +82,7 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           {step === 'password' ? (
-            <Form {...form}>
+            <Form key="password-form" {...form}>
               <form onSubmit={onSubmit} className="flex flex-col gap-4">
                 <FormField
                   control={form.control}
@@ -122,7 +122,7 @@ export default function LoginPage() {
               </form>
             </Form>
           ) : (
-            <Form {...mfaForm}>
+            <Form key="mfa-form" {...mfaForm}>
               <form onSubmit={onSubmitMfaCode} className="flex flex-col gap-4">
                 <FormField
                   control={mfaForm.control}

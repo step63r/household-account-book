@@ -108,7 +108,7 @@ export function ChangeEmailDialog({
         </DialogHeader>
 
         {step === 'request' ? (
-          <Form {...requestForm}>
+          <Form key="request-form" {...requestForm}>
             <form onSubmit={onSubmitRequest} className="flex flex-col gap-4">
               <FormField
                 control={requestForm.control}
@@ -136,7 +136,7 @@ export function ChangeEmailDialog({
             </form>
           </Form>
         ) : (
-          <Form {...confirmForm}>
+          <Form key="confirm-form" {...confirmForm}>
             <form onSubmit={onSubmitConfirm} className="flex flex-col gap-4">
               <FormField
                 control={confirmForm.control}
