@@ -28,9 +28,11 @@ export interface AuthStackProps extends cdk.StackProps {
  *   means external IdPs (Google/Apple/etc.) can be added later as `UserPoolIdentityProvider`
  *   constructs and appended to the client's `supportedIdentityProviders` - additive, not a
  *   pool replacement.
- * - `mfa: Mfa.OPTIONAL` with `mfaSecondFactor: { otp: true, sms: false }` lets users opt into
- *   TOTP (authenticator app, e.g. Microsoft Authenticator) MFA from the Settings screen, without
+ * - `mfa: Mfa.OPTIONAL` with `mfaSecondFactor: { otp: true, sms: false, email: true }` lets users
+ *   opt into either TOTP (authenticator app) or email OTP MFA from the Settings screen, without
  *   requiring it pool-wide. SMS is deliberately not enabled (no SNS/origination number setup).
+ *   Email MFA requires `featurePlan: ESSENTIALS` (or PLUS) and an SES `DEVELOPER` email
+ *   configuration - the latter is already satisfied by `UserPoolEmail.withSES` below.
  * - `keepOriginal: { email: true }` requires verification of a new email address (a code sent to
  *   it) before the attribute actually changes, instead of updating immediately - this backs the
  *   Settings screen's email-change flow, which reuses the same OTP-confirmation UX as sign-up.
@@ -66,7 +68,11 @@ export class AuthStack extends cdk.Stack {
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
       mfa: cognito.Mfa.OPTIONAL,
-      mfaSecondFactor: { otp: true, sms: false },
+      mfaSecondFactor: { otp: true, sms: false, email: true },
+      // Email MFA requires at least the Essentials feature plan (Lite doesn't support it).
+      // Both Essentials and Lite include 10,000 free MAU/month, so this has no cost impact
+      // for this personal-use app.
+      featurePlan: cognito.FeaturePlan.ESSENTIALS,
       // Prod holds real user accounts; dev doesn't need the same blast-radius protection.
       removalPolicy: props.stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
       email: cognito.UserPoolEmail.withSES({
