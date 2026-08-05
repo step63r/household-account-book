@@ -52,7 +52,7 @@
 - 対応ブラウザ: モダンブラウザのみ（Chrome/Safari/Edge最新版、iOS/Android標準ブラウザ）。IE11等のレガシー対応は不要
 - 多言語対応: 日本語のみ。i18nライブラリは導入しない
 - 退会時のデータ削除: 退会操作時点で論理削除し、30日程度の猶予期間後にバッチで物理削除する
-- コストアラート（AWS Budgets）: 現時点では未設定（必要になれば追加）
+- コストアラート（AWS Budgets）: AWSアカウント側でBudgets「月間予算」（月次$300、予測ベース100%超過で通知）を設定済み（2026-08-05）。ただしカスタムドメインと同様に本リポジトリのCDK（`infra/lib/monitoring-stack.ts`）では意図的に管理外としており、Budgetsコンソール等リポジトリ外で設定されたものである点に注意。通知先は`uchi63rs@yahoo.co.jp`（`alertEmail`コンテキストの`ryo-uchiyama@minatoproject.com`とは別アドレス）
 - 監査ログ: 更新系APIの操作ログをCloudWatch Logsに残す
 
 ## リポジトリ構成
@@ -104,5 +104,5 @@ pnpmワークスペース（`pnpm-workspace.yaml`）。ルート`package.json`�
   - GitHub接続はAWS推奨のGitHub App方式（Amplifyコンソールから移行済み、2026-07-24）。当初はPAT + Secrets Manager + `GitHubSourceCodeProvider`（`OauthToken`）で接続していたが、AWSがPAT/OAuthトークン方式を廃止しGitHub App方式への移行を促しているため切替。`infra/lib/hosting-stack.ts`のCDKコードはもう`OauthToken`/`AccessToken`を宣言せず、`Repository`のみをL1 (`CfnApp`) escape hatchで設定している（`amplify.GitHubSourceCodeProvider`はPAT前提でGitHub App接続を表現できないため使用不可。CloudFormationの`UpdateApp`は認証系プロパティを省略すると既存の接続を維持する挙動を利用）。PAT用シークレット（`household-dev-amplify-github-token`）は削除済み（2026-07-25、30日間の復旧期間あり）。GitHub側のPAT自体の失効はユーザー側で対応が必要
   - Amplifyのビルド環境変数（`VITE_API_BASE_URL`/`VITE_COGNITO_USER_POOL_ID`/`VITE_COGNITO_CLIENT_ID`）は`infra/lib/hosting-stack.ts`の`amplify.App`の`environmentVariables`でAuth/Apiスタックからクロススタック参照して注入（`bin/app.ts`でHostingStackにuserPoolId/userPoolClientId/apiEndpointを渡す構成。開発者ローカルの`.env`はgitignore対象でCodeBuild環境には見えないため、ここで明示的に渡さないとフロントが「認証設定が未構成です」のまま本番ビルドされる — 実際にこれで一度ハマって修正した）
   - 動作確認用に手動ビルド（`aws amplify start-job`）を実行しSUCCEED、Amplifyの`https://master.<appId>.amplifyapp.com/`（`aws amplify list-apps`で確認）のJSバンドルに実際のUser Pool IDが埋め込まれていることまで確認済み。以後はmasterへのpushで自動ビルド（**注意**: モノレポ構成だがAmplify Gen1にパスベースのビルドスキップ機能は無く、`apps/backend`や`infra`だけの変更でも毎回フロントのビルドが走る。実害は小さいので現状放置）。実ブラウザでのサインアップ〜ログイン操作自体はまだ未検証
-  - アラート通知先メール（`alertEmail`）は未設定のまま（コンテキストパラメータが空文字）
+  - アラート通知先メール（`alertEmail`）は`ryo-uchiyama@minatoproject.com`を設定しdeploy済み（2026-08-03、`infra/cdk.json`）。SNSサブスクリプション（`household-prod-alerts`トピック）も確認（confirm）済みで、Lambdaエラーアラーム・DynamoDBスロットリングアラームの通知が実際に届く状態
   - パスワードリセット機能用に、Cognito User Poolへ`CustomMessage`トリガー（`customMessageFn`、`infra/lib/auth-stack.ts`）を追加済み。メールリンクに埋め込むフロントエンドURLは`infra/cdk.json`の`context.frontendBaseUrl`（`https://household.minatoproject.com`）から`AuthStack`経由でLambdaの環境変数`FRONTEND_BASE_URL`に注入している。`HostingStack`の出力に依存すると`Auth→Api→Hosting`の依存順と循環するため、あえてコンテキストパラメータ（`alertEmail`/`amplifyGithubRepoUrl`と同じパターン）で受け渡す設計にした
