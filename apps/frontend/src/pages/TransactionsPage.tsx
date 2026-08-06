@@ -60,7 +60,15 @@ import { getMemoSuggestions } from '@/lib/aggregation';
 import { isPlanRestrictedError } from '@/lib/api';
 import { useUserProfile } from '@/lib/profile';
 import { EMPTY_ARRAY } from '@/lib/utils';
-import { addMonthsToDate, clampDateFrom, formatDate, laterDateString, todayJst } from '@/lib/date';
+import {
+  addMonthsToDate,
+  clampDateFrom,
+  formatDate,
+  formatDateWithWeekday,
+  laterDateString,
+  todayJst,
+} from '@/lib/date';
+import { groupTransactionsByDate } from '@/lib/transactionGrouping';
 
 const TYPE_LABEL: Record<TransactionType, string> = {
   income: '収入',
@@ -79,6 +87,12 @@ const yenFormatter = new Intl.NumberFormat('ja-JP', {
   currency: 'JPY',
   maximumFractionDigits: 0,
 });
+
+function getTransactionCategoryLabel(tx: Transaction, categoryById: Map<string, Category>): string {
+  if (tx.type === 'transfer') return tx.transferLabel ?? '-';
+  if (tx.type === 'income') return tx.incomeSource ?? '未分類';
+  return (tx.categoryId && categoryById.get(tx.categoryId)?.name) || '未分類';
+}
 
 /** 日本時間の本日日付（YYYY-MM-DD）。toISOString()はUTC基準になるため使わない
  * （深夜0〜9時のUTC日付が前日にずれる）。 */
@@ -298,6 +312,7 @@ export default function TransactionsPage() {
   const sortedTransactions = [...filteredTransactions].sort(
     (a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt),
   );
+  const groupedTransactions = groupTransactionsByDate(sortedTransactions);
 
   return (
     <div className="flex flex-col gap-6">
@@ -406,7 +421,7 @@ export default function TransactionsPage() {
           </div>
 
           {transactionsQuery.isPending ? (
-            <TransactionsTableSkeleton />
+            <TransactionsSkeleton />
           ) : transactionsQuery.isError ? (
             // プラン制限エラーは上部の案内カードで説明済みのため、ここでは二重表示しない
             isPlanRestrictedError(transactionsQuery.error) ? null : (
@@ -417,63 +432,138 @@ export default function TransactionsPage() {
           ) : sortedTransactions.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">取引がまだありません</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground">
-                    <th className="py-2 pr-3 font-normal">日付</th>
-                    <th className="py-2 pr-3 font-normal">種別</th>
-                    <th className="py-2 pr-3 font-normal">費目</th>
-                    <th className="py-2 pr-3 text-right font-normal">金額</th>
-                    <th className="py-2 pr-3 font-normal">摘要</th>
-                    <th className="py-2 font-normal" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedTransactions.map((tx) => (
-                    <tr key={tx.id} className="border-b border-border last:border-0">
-                      <td className="py-2 pr-3 whitespace-nowrap tabular-nums">
-                        {formatDate(tx.date)}
-                      </td>
-                      <td className="py-2 pr-3">
-                        <Badge variant={TYPE_BADGE_VARIANT[tx.type]}>{TYPE_LABEL[tx.type]}</Badge>
-                      </td>
-                      <td className="py-2 pr-3 text-muted-foreground">
-                        {tx.type === 'transfer'
-                          ? (tx.transferLabel ?? '-')
-                          : tx.type === 'income'
-                            ? (tx.incomeSource ?? '未分類')
-                            : (tx.categoryId && categoryById.get(tx.categoryId)?.name) || '未分類'}
-                      </td>
-                      <td className="py-2 pr-3 text-right tabular-nums font-medium">
-                        {yenFormatter.format(tx.amount)}
-                      </td>
-                      <td className="py-2 pr-3 text-muted-foreground">{tx.memo ?? ''}</td>
-                      <td className="py-2 text-right whitespace-nowrap">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label="編集"
-                          onClick={() => openEditDialog(tx)}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label="削除"
-                          onClick={() => deleteMutation.mutate(tx.id)}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </td>
+            <>
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-muted-foreground">
+                      <th className="py-2 pr-3 font-normal">日付</th>
+                      <th className="py-2 pr-3 font-normal">種別</th>
+                      <th className="py-2 pr-3 font-normal">費目</th>
+                      <th className="py-2 pr-3 text-right font-normal">金額</th>
+                      <th className="py-2 pr-3 font-normal">摘要</th>
+                      <th className="py-2 font-normal" />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {sortedTransactions.map((tx) => (
+                      <tr key={tx.id} className="border-b border-border last:border-0">
+                        <td className="py-2 pr-3 whitespace-nowrap tabular-nums">
+                          {formatDate(tx.date)}
+                        </td>
+                        <td className="py-2 pr-3">
+                          <Badge variant={TYPE_BADGE_VARIANT[tx.type]}>{TYPE_LABEL[tx.type]}</Badge>
+                        </td>
+                        <td className="py-2 pr-3 text-muted-foreground">
+                          {getTransactionCategoryLabel(tx, categoryById)}
+                        </td>
+                        <td className="py-2 pr-3 text-right tabular-nums font-medium">
+                          {yenFormatter.format(tx.amount)}
+                        </td>
+                        <td className="py-2 pr-3 text-muted-foreground">{tx.memo ?? ''}</td>
+                        <td className="py-2 text-right whitespace-nowrap">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="編集"
+                            onClick={() => openEditDialog(tx)}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="削除"
+                            onClick={() => deleteMutation.mutate(tx.id)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex flex-col gap-4 md:hidden">
+                {groupedTransactions.map((group) => (
+                  <div key={group.date}>
+                    <h3 className="mb-2 px-0.5 text-xs font-medium text-muted-foreground">
+                      {formatDateWithWeekday(group.date)}
+                    </h3>
+                    <ul className="flex flex-col gap-2">
+                      {group.transactions.map((tx) => {
+                        const categoryLabel = getTransactionCategoryLabel(tx, categoryById);
+                        return (
+                          <li key={tx.id}>
+                            <Card
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => openEditDialog(tx)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  openEditDialog(tx);
+                                }
+                              }}
+                              aria-label={`${TYPE_LABEL[tx.type]}・${categoryLabel}・${yenFormatter.format(tx.amount)}を編集`}
+                              className="flex-row items-center justify-between gap-3 rounded-lg p-3 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 active:bg-accent/50"
+                            >
+                              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant={TYPE_BADGE_VARIANT[tx.type]}>
+                                    {TYPE_LABEL[tx.type]}
+                                  </Badge>
+                                  <span className="truncate text-sm text-muted-foreground">
+                                    {categoryLabel}
+                                  </span>
+                                </div>
+                                {tx.memo ? (
+                                  <span className="truncate text-xs text-muted-foreground">
+                                    {tx.memo}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="flex shrink-0 items-center gap-1">
+                                <span className="tabular-nums text-sm font-medium">
+                                  {yenFormatter.format(tx.amount)}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label="編集"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditDialog(tx);
+                                  }}
+                                >
+                                  <Pencil className="size-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label="削除"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteMutation.mutate(tx.id);
+                                  }}
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              </div>
+                            </Card>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -481,45 +571,53 @@ export default function TransactionsPage() {
   );
 }
 
-function TransactionsTableSkeleton() {
+function TransactionsSkeleton() {
   return (
-    <div className="overflow-x-auto" aria-label="取引一覧を読み込み中" aria-busy="true">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border text-left text-muted-foreground">
-            <th className="py-2 pr-3 font-normal">日付</th>
-            <th className="py-2 pr-3 font-normal">種別</th>
-            <th className="py-2 pr-3 font-normal">費目</th>
-            <th className="py-2 pr-3 text-right font-normal">金額</th>
-            <th className="py-2 pr-3 font-normal">摘要</th>
-            <th className="py-2 font-normal" />
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({ length: 8 }, (_, i) => (
-            <tr key={i} className="border-b border-border last:border-0">
-              <td className="py-2 pr-3">
-                <Skeleton className="h-4 w-20" />
-              </td>
-              <td className="py-2 pr-3">
-                <Skeleton className="h-5 w-12 rounded-full" />
-              </td>
-              <td className="py-2 pr-3">
-                <Skeleton className="h-4 w-24" />
-              </td>
-              <td className="py-2 pr-3">
-                <Skeleton className="ml-auto h-4 w-16" />
-              </td>
-              <td className="py-2 pr-3">
-                <Skeleton className="h-4 w-32" />
-              </td>
-              <td className="py-2 text-right">
-                <Skeleton className="ml-auto h-8 w-16" />
-              </td>
+    <div aria-label="取引一覧を読み込み中" aria-busy="true">
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-muted-foreground">
+              <th className="py-2 pr-3 font-normal">日付</th>
+              <th className="py-2 pr-3 font-normal">種別</th>
+              <th className="py-2 pr-3 font-normal">費目</th>
+              <th className="py-2 pr-3 text-right font-normal">金額</th>
+              <th className="py-2 pr-3 font-normal">摘要</th>
+              <th className="py-2 font-normal" />
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {Array.from({ length: 8 }, (_, i) => (
+              <tr key={i} className="border-b border-border last:border-0">
+                <td className="py-2 pr-3">
+                  <Skeleton className="h-4 w-20" />
+                </td>
+                <td className="py-2 pr-3">
+                  <Skeleton className="h-5 w-12 rounded-full" />
+                </td>
+                <td className="py-2 pr-3">
+                  <Skeleton className="h-4 w-24" />
+                </td>
+                <td className="py-2 pr-3">
+                  <Skeleton className="ml-auto h-4 w-16" />
+                </td>
+                <td className="py-2 pr-3">
+                  <Skeleton className="h-4 w-32" />
+                </td>
+                <td className="py-2 text-right">
+                  <Skeleton className="ml-auto h-8 w-16" />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex flex-col gap-2 md:hidden">
+        {Array.from({ length: 6 }, (_, i) => (
+          <Skeleton key={i} className="h-[68px] w-full rounded-lg" />
+        ))}
+      </div>
     </div>
   );
 }

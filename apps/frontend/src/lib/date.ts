@@ -10,6 +10,19 @@ export function formatYearMonth(yearMonth: string): string {
   return yearMonth.replaceAll('-', '/');
 }
 
+const WEEKDAY_LABELS_JA = ['日', '月', '火', '水', '木', '金', '土'] as const;
+
+/** ISO日付（yyyy-MM-dd）を「M月d日(曜)」形式に変換する。取引一覧のスマホ版カードの
+ * 日付グルーピング見出しに使う。 */
+export function formatDateWithWeekday(isoDate: string): string {
+  const [yearStr, monthStr, dayStr] = isoDate.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  const weekday = WEEKDAY_LABELS_JA[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+  return `${month}月${day}日(${weekday})`;
+}
+
 /** ISO週番号（yyyy-Www）から、その週の月曜日を返す。 */
 function isoWeekStartDate(period: string): Date {
   const [yearStr, weekStr] = period.split('-W');

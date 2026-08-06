@@ -3,6 +3,7 @@ import {
   addMonthsToDate,
   clampDateFrom,
   formatDateTimeJst,
+  formatDateWithWeekday,
   formatPeriodLabel,
   formatPeriodTick,
   laterDateString,
@@ -14,6 +15,24 @@ describe('formatDateTimeJst', () => {
   it('ISO日時文字列を日本時間の yyyy/MM/dd に変換する', () => {
     // UTC 2026-01-01T15:30:00Z は JST では 2026-01-02 00:30
     expect(formatDateTimeJst('2026-01-01T15:30:00.000Z')).toBe('2026/01/02');
+  });
+});
+
+describe('formatDateWithWeekday', () => {
+  it('ISO日付を「M月d日(曜)」形式に変換する', () => {
+    expect(formatDateWithWeekday('2026-08-05')).toBe('8月5日(水)');
+  });
+
+  it('1桁の月・日をゼロパディングしない', () => {
+    expect(formatDateWithWeekday('2026-01-09')).toBe('1月9日(金)');
+  });
+
+  it('日曜日を正しく表示する', () => {
+    expect(formatDateWithWeekday('2026-08-02')).toBe('8月2日(日)');
+  });
+
+  it('土曜日を正しく表示する', () => {
+    expect(formatDateWithWeekday('2026-08-01')).toBe('8月1日(土)');
   });
 });
 
