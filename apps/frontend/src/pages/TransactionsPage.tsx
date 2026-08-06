@@ -534,18 +534,6 @@ export default function TransactionsPage() {
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  aria-label="編集"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEditDialog(tx);
-                                  }}
-                                >
-                                  <Pencil className="size-4" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
                                   aria-label="削除"
                                   onClick={(e) => {
                                     e.stopPropagation();
