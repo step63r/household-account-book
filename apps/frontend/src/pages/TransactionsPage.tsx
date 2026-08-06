@@ -335,7 +335,7 @@ export default function TransactionsPage() {
             onClick={openCreateDialog}
             size="icon"
             aria-label="取引を追加"
-            className="fixed right-4 bottom-20 z-50 size-14 rounded-full shadow-lg md:right-8 md:bottom-8"
+            className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 size-14 rounded-full shadow-lg md:right-8 md:bottom-8"
           >
             <Plus className="size-6" />
           </Button>
