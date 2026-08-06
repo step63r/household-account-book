@@ -107,11 +107,6 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold">設定</h1>
-        <p className="text-sm text-muted-foreground">アカウント情報の確認・退会手続きを行えます</p>
-      </div>
-
       {successMessage && <p className="text-sm text-muted-foreground">{successMessage}</p>}
 
       <Card>
@@ -120,13 +115,9 @@ export default function SettingsPage() {
           <CardDescription>ログイン中のアカウントの情報です</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2 text-sm">
-          <div className="flex items-center justify-between border-b border-border py-2">
+          <div className="flex items-center justify-between py-2">
             <span className="text-muted-foreground">メールアドレス</span>
             <span className="font-medium">{email ?? '未ログイン'}</span>
-          </div>
-          <div className="flex items-center justify-between py-2">
-            <span className="text-muted-foreground">ステータス</span>
-            <span className="font-medium">active</span>
           </div>
         </CardContent>
         <CardFooter>
@@ -259,10 +250,6 @@ export default function SettingsPage() {
       <Card className="border-destructive/40">
         <CardHeader>
           <CardTitle className="text-destructive">退会</CardTitle>
-          <CardDescription>
-            退会すると、すぐにログインできなくなります。データは退会操作時点で論理削除され、
-            30日程度の猶予期間後に完全に削除されます。
-          </CardDescription>
         </CardHeader>
         <CardFooter>
           <Dialog>

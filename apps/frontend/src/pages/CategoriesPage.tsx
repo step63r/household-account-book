@@ -88,31 +88,29 @@ export default function CategoriesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">費目</h1>
-          <p className="text-sm text-muted-foreground">固定費・変動費ごとに費目を管理します</p>
-        </div>
-        <Dialog
-          open={dialogState.open}
-          onOpenChange={(open) => setDialogState((s) => ({ ...s, open }))}
-        >
-          <DialogTrigger asChild>
-            <Button onClick={openCreateDialog}>
-              <Plus className="size-4" />
-              費目を追加
-            </Button>
-          </DialogTrigger>
-          <CategoryFormDialog
-            key={dialogState.category?.id ?? 'new'}
-            category={dialogState.category}
-            pending={upsertMutation.isPending}
-            onSubmit={(input) =>
-              upsertMutation.mutate({ id: dialogState.category?.id ?? null, input })
-            }
-          />
-        </Dialog>
-      </div>
+      <Dialog
+        open={dialogState.open}
+        onOpenChange={(open) => setDialogState((s) => ({ ...s, open }))}
+      >
+        <DialogTrigger asChild>
+          <Button
+            onClick={openCreateDialog}
+            size="icon"
+            aria-label="費目を追加"
+            className="fixed right-4 bottom-20 z-50 size-14 rounded-full shadow-lg md:right-8 md:bottom-8"
+          >
+            <Plus className="size-6" />
+          </Button>
+        </DialogTrigger>
+        <CategoryFormDialog
+          key={dialogState.category?.id ?? 'new'}
+          category={dialogState.category}
+          pending={upsertMutation.isPending}
+          onSubmit={(input) =>
+            upsertMutation.mutate({ id: dialogState.category?.id ?? null, input })
+          }
+        />
+      </Dialog>
 
       <CategoryGroupCard
         title="固定費"

@@ -127,11 +127,6 @@ export default function BudgetsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold">予算</h1>
-        <p className="text-sm text-muted-foreground">月・費目ごとに予算を設定します</p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>対象月</CardTitle>

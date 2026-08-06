@@ -126,27 +126,21 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">ダッシュボード</h1>
-          <p className="text-sm text-muted-foreground">収支の推移と予算の状況を確認できます</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Input
-            type="month"
-            value={selectedYearMonth}
-            min={planFloorDate?.slice(0, 7)}
-            max={currentMonth}
-            onChange={(e) => setSelectedYearMonth(e.target.value)}
-            className="w-40"
-            aria-label="表示する年月"
-          />
-          {selectedYearMonth !== currentMonth && (
-            <Button variant="outline" size="sm" onClick={() => setSelectedYearMonth(currentMonth)}>
-              今月に戻す
-            </Button>
-          )}
-        </div>
+      <div className="flex items-center gap-2">
+        <Input
+          type="month"
+          value={selectedYearMonth}
+          min={planFloorDate?.slice(0, 7)}
+          max={currentMonth}
+          onChange={(e) => setSelectedYearMonth(e.target.value)}
+          className="w-40"
+          aria-label="表示する年月"
+        />
+        {selectedYearMonth !== currentMonth && (
+          <Button variant="outline" size="sm" onClick={() => setSelectedYearMonth(currentMonth)}>
+            今月に戻す
+          </Button>
+        )}
       </div>
 
       <SummaryStatTiles

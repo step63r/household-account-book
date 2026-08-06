@@ -7,7 +7,7 @@ import {
   useQueryClient,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   createTransactionInputSchema,
   INCOME_SOURCE_PRESETS,
@@ -19,7 +19,7 @@ import {
 } from '@household/shared';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { AmountInput } from '@/components/ui/amount-input';
@@ -59,7 +59,7 @@ import {
 import { getMemoSuggestions } from '@/lib/aggregation';
 import { isPlanRestrictedError } from '@/lib/api';
 import { useUserProfile } from '@/lib/profile';
-import { EMPTY_ARRAY } from '@/lib/utils';
+import { cn, EMPTY_ARRAY } from '@/lib/utils';
 import {
   addMonthsToDate,
   clampDateFrom,
@@ -179,6 +179,7 @@ export default function TransactionsPage() {
   const [amountMin, setAmountMin] = useState(NaN);
   const [amountMax, setAmountMax] = useState(NaN);
   const [memoQuery, setMemoQuery] = useState('');
+  const [detailSearchOpen, setDetailSearchOpen] = useState(false);
 
   // ページ読み込み時点（あるいはプラン判明後）のdateFromがfloorDateより古い場合はfloorDateにクランプする
   useEffect(() => {
@@ -243,6 +244,15 @@ export default function TransactionsPage() {
       setDateFrom(laterDateString(minFrom, floorDate) ?? minFrom);
     }
   }
+
+  const hasActiveFilters =
+    dateFrom !== defaultRange.from ||
+    dateTo !== defaultRange.to ||
+    selectedTypes.length > 0 ||
+    selectedCategoryIds.length > 0 ||
+    !Number.isNaN(amountMin) ||
+    !Number.isNaN(amountMax) ||
+    memoQuery.trim() !== '';
 
   function clearFilters() {
     setDateFrom(defaultRange.from);
@@ -316,40 +326,35 @@ export default function TransactionsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">取引</h1>
-          <p className="text-sm text-muted-foreground">収入・支出・振替を記録します</p>
-        </div>
-        <Dialog
-          open={dialogState.open}
+      <Dialog
+        open={dialogState.open}
+        onOpenChange={(open) => setDialogState((s) => ({ ...s, open }))}
+      >
+        <DialogTrigger asChild>
+          <Button
+            onClick={openCreateDialog}
+            size="icon"
+            aria-label="取引を追加"
+            className="fixed right-4 bottom-20 z-50 size-14 rounded-full shadow-lg md:right-8 md:bottom-8"
+          >
+            <Plus className="size-6" />
+          </Button>
+        </DialogTrigger>
+        <TransactionFormDialog
+          key={dialogState.transaction?.id ?? 'new'}
+          transaction={dialogState.transaction}
+          categories={categories}
+          createMutation={createMutation}
+          updateMutation={updateMutation}
           onOpenChange={(open) => setDialogState((s) => ({ ...s, open }))}
-        >
-          <DialogTrigger asChild>
-            <Button onClick={openCreateDialog}>
-              <Plus className="size-4" />
-              取引を追加
-            </Button>
-          </DialogTrigger>
-          <TransactionFormDialog
-            key={dialogState.transaction?.id ?? 'new'}
-            transaction={dialogState.transaction}
-            categories={categories}
-            createMutation={createMutation}
-            updateMutation={updateMutation}
-            onOpenChange={(open) => setDialogState((s) => ({ ...s, open }))}
-          />
-        </Dialog>
-      </div>
+        />
+      </Dialog>
 
       {planRestricted && <PlanRestrictionNotice />}
 
       <Card>
-        <CardHeader>
-          <CardTitle>取引一覧</CardTitle>
-        </CardHeader>
         <CardContent>
-          <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div className="mb-4 flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <Input
                 type="date"
@@ -360,7 +365,7 @@ export default function TransactionsPage() {
                   floorDate,
                 )}
                 max={dateTo || undefined}
-                className="w-36"
+                className="w-36 text-sm"
               />
               <span className="text-muted-foreground text-sm">〜</span>
               <Input
@@ -369,42 +374,8 @@ export default function TransactionsPage() {
                 onChange={(e) => handleDateToChange(e.target.value)}
                 min={dateFrom || undefined}
                 max={dateFrom ? addMonthsToDate(dateFrom, MAX_DATE_RANGE_MONTHS) : undefined}
-                className="w-36"
+                className="w-36 text-sm"
               />
-            </div>
-
-            <MultiSelectFilter
-              label="種別"
-              options={TYPE_FILTER_OPTIONS.map((type) => ({
-                value: type,
-                label: TYPE_LABEL[type],
-              }))}
-              selected={selectedTypes}
-              onChange={(values) => setSelectedTypes(values as TransactionType[])}
-            />
-
-            <MultiSelectFilter
-              label="費目"
-              options={displayedCategoryOptions}
-              selected={selectedCategoryIds}
-              onChange={setSelectedCategoryIds}
-            />
-
-            <div className="flex items-center gap-2">
-              <AmountInput
-                value={amountMin}
-                onChange={setAmountMin}
-                placeholder="下限"
-                className="w-24"
-              />
-              <span className="text-muted-foreground text-sm">円〜</span>
-              <AmountInput
-                value={amountMax}
-                onChange={setAmountMax}
-                placeholder="上限"
-                className="w-24"
-              />
-              <span className="text-muted-foreground text-sm">円</span>
             </div>
 
             <Input
@@ -412,12 +383,69 @@ export default function TransactionsPage() {
               value={memoQuery}
               onChange={(e) => setMemoQuery(e.target.value)}
               placeholder="摘要で検索"
-              className="w-40"
+              className="w-full text-sm sm:w-64"
             />
 
-            <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
-              フィルタを解除
-            </Button>
+            <div>
+              <button
+                type="button"
+                onClick={() => setDetailSearchOpen((open) => !open)}
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                aria-expanded={detailSearchOpen}
+              >
+                詳細検索
+                <ChevronDown
+                  className={cn('size-4 transition-transform', detailSearchOpen && 'rotate-180')}
+                  aria-hidden="true"
+                />
+              </button>
+
+              {detailSearchOpen && (
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <MultiSelectFilter
+                    label="種別"
+                    options={TYPE_FILTER_OPTIONS.map((type) => ({
+                      value: type,
+                      label: TYPE_LABEL[type],
+                    }))}
+                    selected={selectedTypes}
+                    onChange={(values) => setSelectedTypes(values as TransactionType[])}
+                  />
+
+                  <MultiSelectFilter
+                    label="費目"
+                    options={displayedCategoryOptions}
+                    selected={selectedCategoryIds}
+                    onChange={setSelectedCategoryIds}
+                  />
+
+                  <div className="flex items-center gap-2">
+                    <AmountInput
+                      value={amountMin}
+                      onChange={setAmountMin}
+                      placeholder="下限"
+                      className="w-24 text-sm"
+                    />
+                    <span className="text-muted-foreground text-sm">円〜</span>
+                    <AmountInput
+                      value={amountMax}
+                      onChange={setAmountMax}
+                      placeholder="上限"
+                      className="w-24 text-sm"
+                    />
+                    <span className="text-muted-foreground text-sm">円</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {hasActiveFilters && (
+              <div>
+                <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+                  フィルタを解除
+                </Button>
+              </div>
+            )}
           </div>
 
           {transactionsQuery.isPending ? (
