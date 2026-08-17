@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   useMutation,
@@ -276,6 +276,8 @@ export default function TransactionsPage() {
     mutationFn: async (input: CreateTransactionInput) => createTransaction(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      // 追加した取引の摘要を、一覧の再読み込みを待たずにサジェストへ反映する
+      void queryClient.invalidateQueries({ queryKey: ['memo-suggestions'] });
     },
   });
 
@@ -284,6 +286,7 @@ export default function TransactionsPage() {
       updateTransaction(id, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      void queryClient.invalidateQueries({ queryKey: ['memo-suggestions'] });
     },
   });
 
@@ -681,9 +684,19 @@ function TransactionFormDialog({
     setPendingAction(null);
   }, [open, transaction, form]);
 
+  // 摘要のサジェストは、支出で費目が選ばれている間はその費目の取引に絞り込む
+  const categoryIdValue = useWatch({ control: form.control, name: 'categoryId' });
+  const memoSuggestionCategoryId =
+    typeValue === 'expense' ? (categoryIdValue ?? undefined) : undefined;
+
   const memoSuggestionsQuery = useQuery({
-    queryKey: ['memo-suggestions'],
-    queryFn: () => getMemoSuggestions({ from: addMonthsToDate(todayJst(), -3), to: todayJst() }),
+    queryKey: ['memo-suggestions', memoSuggestionCategoryId ?? null],
+    queryFn: () =>
+      getMemoSuggestions({
+        from: addMonthsToDate(todayJst(), -3),
+        to: todayJst(),
+        categoryId: memoSuggestionCategoryId,
+      }),
     staleTime: 5 * 60 * 1000,
   });
 

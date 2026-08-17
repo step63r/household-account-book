@@ -424,6 +424,32 @@ describe('getMemoSuggestions', () => {
 
     expect(suggestions).toEqual(['古参の店']);
   });
+
+  it('scopes suggestions to the given categoryId when provided', async () => {
+    const repository = new FakeTransactionRepository();
+    await repository.put(
+      makeTransaction({
+        date: '2026-07-01',
+        type: 'expense',
+        amount: 1000,
+        categoryId: 'c1',
+        memo: '食費の店',
+      }),
+    );
+    await repository.put(
+      makeTransaction({
+        date: '2026-07-02',
+        type: 'expense',
+        amount: 2000,
+        categoryId: 'c2',
+        memo: '交通費の店',
+      }),
+    );
+
+    const suggestions = await getMemoSuggestions(repository, 'user-1', { categoryId: 'c1' });
+
+    expect(suggestions).toEqual(['食費の店']);
+  });
 });
 
 describe('plan-based access window', () => {

@@ -13,9 +13,10 @@ const userRepository = new DynamoUserRepository();
 const householdRepository = new DynamoHouseholdRepository();
 
 /**
- * GET /aggregation/memo-suggestions?from=YYYY-MM-DD&to=YYYY-MM-DD
+ * GET /aggregation/memo-suggestions?from=YYYY-MM-DD&to=YYYY-MM-DD&categoryId=<id>
  * 過去の摘要を直近使用日→使用回数の順で重複除去し、上位20件を返す。from/to省略時は全履歴が対象
  * （free プランは from を直近3ヶ月分にクランプする。listTransactionsと同じ period-filter の意味を持つため）。
+ * categoryId指定時は、その費目の取引のみに絞り込む。
  */
 export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
   try {

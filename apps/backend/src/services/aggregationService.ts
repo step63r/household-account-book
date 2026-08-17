@@ -40,6 +40,7 @@ export const budgetVarianceQuerySchema = z.object({
 export const memoSuggestionsQuerySchema = z.object({
   from: dateSchema.optional(),
   to: dateSchema.optional(),
+  categoryId: z.string().optional(),
 });
 
 const MEMO_SUGGESTIONS_LIMIT = 20;
@@ -209,6 +210,7 @@ export async function getBudgetVariance(
 /**
  * 摘要のサジェスト候補。空文字を除いた過去のmemoを重複除去し、直近使用日→使用回数の順で
  * 上位{@link MEMO_SUGGESTIONS_LIMIT}件を返す。from/to省略時は全履歴が対象。
+ * categoryIdを指定すると、その費目の取引に絞り込んだ上で候補を集計する。
  */
 export async function getMemoSuggestions(
   transactionRepository: TransactionRepository,
@@ -216,16 +218,19 @@ export async function getMemoSuggestions(
   rawQuery: unknown,
   plan: UserPlan = 'paid',
 ): Promise<string[]> {
-  const { from, to } = memoSuggestionsQuerySchema.parse(rawQuery);
+  const { from, to, categoryId } = memoSuggestionsQuerySchema.parse(rawQuery);
   // Same from/to period-filter semantics as listTransactions, so clamp identically.
   const clampedFrom = clampFromParam(plan, from);
   const transactions = await transactionRepository.listByHousehold(householdId, {
     from: clampedFrom,
     to,
   });
+  const scopedTransactions = categoryId
+    ? transactions.filter((transaction) => transaction.categoryId === categoryId)
+    : transactions;
 
   const stats = new Map<string, { count: number; lastUsedAt: string }>();
-  for (const transaction of transactions) {
+  for (const transaction of scopedTransactions) {
     const memo = transaction.memo?.trim();
     if (!memo) continue;
     const existing = stats.get(memo);
