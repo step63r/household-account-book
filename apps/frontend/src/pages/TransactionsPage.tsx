@@ -342,6 +342,7 @@ export default function TransactionsPage() {
         </DialogTrigger>
         <TransactionFormDialog
           key={dialogState.transaction?.id ?? 'new'}
+          open={dialogState.open}
           transaction={dialogState.transaction}
           categories={categories}
           createMutation={createMutation}
@@ -639,12 +640,14 @@ function TransactionsSkeleton() {
 }
 
 function TransactionFormDialog({
+  open,
   transaction,
   categories,
   createMutation,
   updateMutation,
   onOpenChange,
 }: {
+  open: boolean;
   transaction: Transaction | null;
   categories: readonly Category[];
   createMutation: UseMutationResult<Transaction, Error, CreateTransactionInput>;
@@ -666,6 +669,17 @@ function TransactionFormDialog({
   );
 
   const [pendingAction, setPendingAction] = useState<'submit' | 'continuous' | null>(null);
+
+  // 登録ボタン押下の有無にかかわらず、ダイアログが閉じたら入力内容をクリアする
+  // （createモードはkeyが'new'固定でコンポーネントが再マウントされないため、
+  // 開閉のたびにフォーム状態が残ってしまうのを防ぐ）。
+  useEffect(() => {
+    if (open) return;
+    form.reset(defaultFormValues(transaction));
+    setTypeValue(transaction?.type ?? 'expense');
+    setCustomIncomeSource(isCustomIncomeSource(transaction?.incomeSource ?? ''));
+    setPendingAction(null);
+  }, [open, transaction, form]);
 
   const memoSuggestionsQuery = useQuery({
     queryKey: ['memo-suggestions'],
