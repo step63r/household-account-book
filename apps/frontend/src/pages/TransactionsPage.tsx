@@ -7,7 +7,7 @@ import {
   useQueryClient,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import { ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, Pencil, Plus, Trash2, X } from 'lucide-react';
 import {
   createTransactionInputSchema,
   INCOME_SOURCE_PRESETS,
@@ -875,9 +875,21 @@ function TransactionFormDialog({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>摘要</FormLabel>
-                <FormControl>
-                  <Input list="memo-suggestions" placeholder="任意" {...field} />
-                </FormControl>
+                <div className="relative">
+                  <FormControl>
+                    <Input list="memo-suggestions" placeholder="任意" className="pr-8" {...field} />
+                  </FormControl>
+                  {field.value ? (
+                    <button
+                      type="button"
+                      onClick={() => field.onChange('')}
+                      aria-label="摘要をクリア"
+                      className="absolute right-6 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  ) : null}
+                </div>
                 <FormMessage />
               </FormItem>
             )}
