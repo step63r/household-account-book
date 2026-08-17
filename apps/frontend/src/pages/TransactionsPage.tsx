@@ -890,14 +890,19 @@ function TransactionFormDialog({
                 <FormLabel>摘要</FormLabel>
                 <div className="relative">
                   <FormControl>
-                    <Input list="memo-suggestions" placeholder="任意" className="pr-8" {...field} />
+                    <Input
+                      list="memo-suggestions"
+                      placeholder="任意"
+                      className="pr-12"
+                      {...field}
+                    />
                   </FormControl>
                   {field.value ? (
                     <button
                       type="button"
                       onClick={() => field.onChange('')}
                       aria-label="摘要をクリア"
-                      className="absolute right-6 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      className="absolute right-8 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
                       <X className="size-4" />
                     </button>
