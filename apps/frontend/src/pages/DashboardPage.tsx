@@ -76,8 +76,15 @@ export default function DashboardPage() {
 
   const trendRange = trendRangeFor(granularity, selectedYearMonth, planFloorDate);
   const trendQuery = useQuery({
-    queryKey: ['aggregation', 'trend', granularity, trendRange.from ?? null, trendRange.to],
-    queryFn: async () => getTrend({ granularity, ...trendRange }),
+    queryKey: [
+      'aggregation',
+      'trend',
+      granularity,
+      trendRange.from ?? null,
+      trendRange.to,
+      'excludeFixed',
+    ],
+    queryFn: async () => getTrend({ granularity, ...trendRange, excludeFixed: true }),
   });
 
   const kpiRangeTo = monthDateRange(yearMonth).to;
@@ -158,7 +165,7 @@ export default function DashboardPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <CardTitle>収支推移</CardTitle>
-              <CardDescription>収入・支出の推移（振替は含みません）</CardDescription>
+              <CardDescription>収入・支出の推移（振替・固定費は含みません）</CardDescription>
             </div>
             <Tabs value={granularity} onValueChange={(v) => setGranularity(v as TrendGranularity)}>
               <TabsList>
@@ -184,7 +191,9 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>予実差（費目別）</CardTitle>
-            <CardDescription>{formatYearMonth(yearMonth)} の予算に対する実績</CardDescription>
+            <CardDescription>
+              {formatYearMonth(yearMonth)} の予算に対する実績（変動費のみ）
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <BudgetVarianceList
@@ -198,7 +207,9 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>費目別支出の内訳</CardTitle>
-            <CardDescription>{formatYearMonth(yearMonth)} の支出（費目別）</CardDescription>
+            <CardDescription>
+              {formatYearMonth(yearMonth)} の支出（費目別・変動費のみ）
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <CategoryBreakdownChart

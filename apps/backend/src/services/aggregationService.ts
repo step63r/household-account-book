@@ -25,6 +25,7 @@ export const trendQuerySchema = z.object({
   granularity: trendGranularitySchema,
   from: dateSchema.optional(),
   to: dateSchema,
+  excludeFixed: z.literal('true').optional(),
 });
 
 export const categoryPivotQuerySchema = z.object({
@@ -75,19 +76,23 @@ function periodOf(date: string, granularity: TrendGranularity): string {
  * 収支（income/expense）推移。日/週/月/年粒度で集計する（CLAUDE.mdのtransfer除外ルール）。
  * transferはincome/expenseの集計からは除外しつつ、フロントの資産形成推移（累計）チャートで
  * 再利用できるよう期間ごとの合計を並行して`transfer`フィールドに持たせる。
+ * `excludeFixed=true`指定時は固定費（`type: 'fixed'`）の費目に紐づくexpenseを合計から除外する
+ * （ダッシュボードの収支推移グラフ専用。KPIタイル・資産形成推移用の呼び出しでは指定しない）。
  */
 export async function getTrend(
   transactionRepository: TransactionRepository,
+  categoryRepository: CategoryRepository,
   householdId: string,
   rawQuery: unknown,
   plan: UserPlan = 'paid',
 ): Promise<TrendPoint[]> {
-  const { granularity, from, to } = trendQuerySchema.parse(rawQuery);
+  const { granularity, from, to, excludeFixed } = trendQuerySchema.parse(rawQuery);
   const clampedFrom = clampFromParam(plan, from);
-  const transactions = await transactionRepository.listByHousehold(householdId, {
-    from: clampedFrom,
-    to,
-  });
+  const [transactions, categories] = await Promise.all([
+    transactionRepository.listByHousehold(householdId, { from: clampedFrom, to }),
+    excludeFixed === 'true' ? categoryRepository.listByHousehold(householdId) : Promise.resolve([]),
+  ]);
+  const categoryById = new Map(categories.map((category) => [category.id, category]));
 
   const buckets = new Map<string, { income: number; expense: number; transfer: number }>();
   for (const transaction of transactions) {
@@ -96,7 +101,13 @@ export async function getTrend(
     if (transaction.type === 'income') {
       bucket.income += transaction.amount;
     } else if (transaction.type === 'expense') {
-      bucket.expense += transaction.amount;
+      const isFixed =
+        excludeFixed === 'true' &&
+        !!transaction.categoryId &&
+        categoryById.get(transaction.categoryId)?.type === 'fixed';
+      if (!isFixed) {
+        bucket.expense += transaction.amount;
+      }
     } else {
       bucket.transfer += transaction.amount;
     }
@@ -108,7 +119,8 @@ export async function getTrend(
     .map(([period, { income, expense, transfer }]) => ({ period, income, expense, transfer }));
 }
 
-/** 費目別ピボット（expenseのみ、transferだけでなくincomeも除外 - 費目集計の対象は支出）。 */
+/** 費目別ピボット（expenseのみ、transferだけでなくincomeも除外 - 費目集計の対象は支出）。
+ * 固定費（`type: 'fixed'`）の費目は変動費の推移を見やすくするため常に除外する。 */
 export async function getCategoryPivot(
   transactionRepository: TransactionRepository,
   categoryRepository: CategoryRepository,
@@ -127,6 +139,7 @@ export async function getCategoryPivot(
 
   for (const transaction of transactions) {
     if (transaction.type !== 'expense' || !transaction.categoryId) continue;
+    if (categoryById.get(transaction.categoryId)?.type === 'fixed') continue;
     const categoryName = categoryById.get(transaction.categoryId)?.name ?? '未分類';
     const period = periodOf(transaction.date, granularity);
     const row = rows.get(transaction.categoryId) ?? {
@@ -141,7 +154,8 @@ export async function getCategoryPivot(
   return [...rows.values()].sort((a, b) => a.categoryName.localeCompare(b.categoryName, 'ja'));
 }
 
-/** 予実差（指定月・費目別、expenseのみ）。budgetsとactualsの両方に現れる費目を和集合で列挙する。 */
+/** 予実差（指定月・費目別、expenseのみ）。budgetsとactualsの両方に現れる費目を和集合で列挙する。
+ * 固定費（`type: 'fixed'`）の費目は変動費の予実差を見やすくするため常に除外する。 */
 export async function getBudgetVariance(
   transactionRepository: TransactionRepository,
   budgetRepository: BudgetRepository,
@@ -175,13 +189,11 @@ export async function getBudgetVariance(
     );
   }
 
-  const categoryIds = new Set([...budgets.map((b) => b.categoryId), ...actualByCategory.keys()]);
+  const categoryIds = [
+    ...new Set([...budgets.map((b) => b.categoryId), ...actualByCategory.keys()]),
+  ].filter((categoryId) => categoryById.get(categoryId)?.type !== 'fixed');
 
-  // Matches the frontend's (now superseded) client-side computeBudgetVariance ordering:
-  // fixed categories before variable, then by sortOrder, with missing categories (未分類) last.
-  const categoryTypeOrder: Record<'fixed' | 'variable', number> = { fixed: 0, variable: 1 };
-
-  return [...categoryIds]
+  return categoryIds
     .map((categoryId) => {
       const category = categoryById.get(categoryId);
       const budgetAmount = budgets.find((b) => b.categoryId === categoryId)?.amount ?? 0;
@@ -196,9 +208,6 @@ export async function getBudgetVariance(
       return { row, category };
     })
     .sort((a, b) => {
-      const typeOrderA = a.category ? categoryTypeOrder[a.category.type] : 2;
-      const typeOrderB = b.category ? categoryTypeOrder[b.category.type] : 2;
-      if (typeOrderA !== typeOrderB) return typeOrderA - typeOrderB;
       const sortOrderA = a.category?.sortOrder ?? Infinity;
       const sortOrderB = b.category?.sortOrder ?? Infinity;
       if (sortOrderA !== sortOrderB) return sortOrderA - sortOrderB;

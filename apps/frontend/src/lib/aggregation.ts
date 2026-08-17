@@ -14,15 +14,18 @@ import type {
 
 import { apiFetch } from '@/lib/api';
 
-/** GET /aggregation/trend?granularity=day|week|month|year&from=YYYY-MM-DD&to=YYYY-MM-DD
- * transfer を除外した収支推移。from省略時は全履歴が対象。 */
+/** GET /aggregation/trend?granularity=day|week|month|year&from=YYYY-MM-DD&to=YYYY-MM-DD&excludeFixed=true
+ * transfer を除外した収支推移。from省略時は全履歴が対象。excludeFixed指定時は固定費の費目を
+ * expenseの合計から除外する（ダッシュボードの収支推移グラフ専用。KPIタイル・資産形成推移では使わない）。 */
 export function getTrend(params: {
   granularity: TrendGranularity;
   from?: string;
   to: string;
+  excludeFixed?: boolean;
 }): Promise<TrendPoint[]> {
   const query = new URLSearchParams({ granularity: params.granularity, to: params.to });
   if (params.from) query.set('from', params.from);
+  if (params.excludeFixed) query.set('excludeFixed', 'true');
   return apiFetch<TrendPoint[]>(`/aggregation/trend?${query.toString()}`);
 }
 
