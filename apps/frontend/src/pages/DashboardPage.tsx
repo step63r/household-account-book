@@ -10,8 +10,8 @@ import { resolvePlanFloorDateString } from '@household/shared';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { MonthNavigator } from '@/components/MonthNavigator';
 import { TrendChart } from '@/components/charts/TrendChart';
 import { AssetFormationChart } from '@/components/charts/AssetFormationChart';
 import { BudgetVarianceList } from '@/components/charts/BudgetVarianceList';
@@ -134,14 +134,11 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-2">
-        <Input
-          type="month"
+        <MonthNavigator
           value={selectedYearMonth}
+          onChange={setSelectedYearMonth}
           min={planFloorDate?.slice(0, 7)}
           max={currentMonth}
-          onChange={(e) => setSelectedYearMonth(e.target.value)}
-          className="w-40"
-          aria-label="表示する年月"
         />
         {selectedYearMonth !== currentMonth && (
           <Button variant="outline" size="sm" onClick={() => setSelectedYearMonth(currentMonth)}>

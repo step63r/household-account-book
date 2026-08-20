@@ -48,6 +48,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { MultiSelectFilter } from '@/components/ui/multi-select-filter';
+import { MonthNavigator } from '@/components/MonthNavigator';
 import { PlanRestrictionNotice } from '@/components/plan/PlanRestrictionNotice';
 import { getCategories } from '@/lib/categories';
 import {
@@ -65,7 +66,6 @@ import {
   clampDateFrom,
   formatDate,
   formatDateWithWeekday,
-  laterDateString,
   todayJst,
 } from '@/lib/date';
 import { groupTransactionsByDate } from '@/lib/transactionGrouping';
@@ -160,9 +160,6 @@ function buildTransactionInput(values: CreateTransactionInput): CreateTransactio
 /** 種別フィルタの選択肢（順序固定）。 */
 const TYPE_FILTER_OPTIONS: TransactionType[] = ['income', 'expense', 'transfer'];
 
-/** 取引一覧の範囲指定で許容する最大期間（月数）。 */
-const MAX_DATE_RANGE_MONTHS = 3;
-
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
 
@@ -170,10 +167,10 @@ export default function TransactionsPage() {
   const profileQuery = useUserProfile();
   const plan = profileQuery.data?.plan;
   const floorDate = plan === 'free' ? resolvePlanFloorDateString('free', new Date()) : undefined;
+  const floorMonth = floorDate?.slice(0, 7);
+  const currentMonth = currentYearMonth();
 
-  const defaultRange = monthDateRange(currentYearMonth());
-  const [dateFrom, setDateFrom] = useState(defaultRange.from);
-  const [dateTo, setDateTo] = useState(defaultRange.to);
+  const [selectedYearMonth, setSelectedYearMonth] = useState(currentMonth);
   const [selectedTypes, setSelectedTypes] = useState<TransactionType[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [amountMin, setAmountMin] = useState(NaN);
@@ -181,15 +178,16 @@ export default function TransactionsPage() {
   const [memoQuery, setMemoQuery] = useState('');
   const [detailSearchOpen, setDetailSearchOpen] = useState(false);
 
-  // ページ読み込み時点（あるいはプラン判明後）のdateFromがfloorDateより古い場合はfloorDateにクランプする
+  // ページ読み込み時点（あるいはプラン判明後）の選択月がfloorMonthより古い場合はfloorMonthにクランプする
   useEffect(() => {
-    if (!floorDate) return;
-    setDateFrom((prev) => clampDateFrom(prev, floorDate));
-  }, [floorDate]);
+    if (!floorMonth) return;
+    setSelectedYearMonth((prev) => clampDateFrom(prev, floorMonth));
+  }, [floorMonth]);
 
+  const dateRange = monthDateRange(selectedYearMonth);
   const transactionsQuery = useQuery({
-    queryKey: ['transactions', dateFrom, dateTo],
-    queryFn: async () => getTransactions({ from: dateFrom || undefined, to: dateTo || undefined }),
+    queryKey: ['transactions', dateRange.from, dateRange.to],
+    queryFn: async () => getTransactions(dateRange),
   });
   const categoriesQuery = useQuery({
     queryKey: ['categories'],
@@ -214,40 +212,8 @@ export default function TransactionsPage() {
     return categories.filter((c) => ids.has(c.id)).map((c) => ({ value: c.id, label: c.name }));
   }, [transactions, categories]);
 
-  /** FROMを変更。無料プランのfloorDateより古い値はクランプする。
-   * TOがFROMより前になる場合はTOをFROMに合わせ、範囲が最大期間を超える場合はTOを詰める。 */
-  function handleDateFromChange(value: string) {
-    const clamped = clampDateFrom(value, floorDate);
-    setDateFrom(clamped);
-    if (!clamped) return;
-    if (dateTo && dateTo < clamped) {
-      setDateTo(clamped);
-      return;
-    }
-    const maxTo = addMonthsToDate(clamped, MAX_DATE_RANGE_MONTHS);
-    if (dateTo && dateTo > maxTo) {
-      setDateTo(maxTo);
-    }
-  }
-
-  /** TOを変更。FROMがTOより後になる場合はFROMをTOに合わせ、範囲が最大期間を超える場合はFROMを詰める。
-   * いずれも無料プランのfloorDateより古くはしない。 */
-  function handleDateToChange(value: string) {
-    setDateTo(value);
-    if (!value) return;
-    if (dateFrom && dateFrom > value) {
-      setDateFrom(clampDateFrom(value, floorDate));
-      return;
-    }
-    const minFrom = addMonthsToDate(value, -MAX_DATE_RANGE_MONTHS);
-    if (dateFrom && dateFrom < minFrom) {
-      setDateFrom(laterDateString(minFrom, floorDate) ?? minFrom);
-    }
-  }
-
   const hasActiveFilters =
-    dateFrom !== defaultRange.from ||
-    dateTo !== defaultRange.to ||
+    selectedYearMonth !== currentMonth ||
     selectedTypes.length > 0 ||
     selectedCategoryIds.length > 0 ||
     !Number.isNaN(amountMin) ||
@@ -255,8 +221,7 @@ export default function TransactionsPage() {
     memoQuery.trim() !== '';
 
   function clearFilters() {
-    setDateFrom(defaultRange.from);
-    setDateTo(defaultRange.to);
+    setSelectedYearMonth(currentMonth);
     setSelectedTypes([]);
     setSelectedCategoryIds([]);
     setAmountMin(NaN);
@@ -359,28 +324,12 @@ export default function TransactionsPage() {
       <Card>
         <CardContent>
           <div className="mb-4 flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => handleDateFromChange(e.target.value)}
-                min={laterDateString(
-                  dateTo ? addMonthsToDate(dateTo, -MAX_DATE_RANGE_MONTHS) : undefined,
-                  floorDate,
-                )}
-                max={dateTo || undefined}
-                className="w-36 text-sm"
-              />
-              <span className="text-muted-foreground text-sm">〜</span>
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => handleDateToChange(e.target.value)}
-                min={dateFrom || undefined}
-                max={dateFrom ? addMonthsToDate(dateFrom, MAX_DATE_RANGE_MONTHS) : undefined}
-                className="w-36 text-sm"
-              />
-            </div>
+            <MonthNavigator
+              value={selectedYearMonth}
+              onChange={setSelectedYearMonth}
+              min={floorMonth}
+              max={currentMonth}
+            />
 
             <Input
               type="text"

@@ -6,8 +6,8 @@ import {
   formatDateWithWeekday,
   formatPeriodLabel,
   formatPeriodTick,
-  laterDateString,
   monthDateRange,
+  nextYearMonth,
   previousYearMonth,
 } from './date';
 
@@ -43,6 +43,16 @@ describe('previousYearMonth', () => {
 
   it('1月は前年12月にロールオーバーする', () => {
     expect(previousYearMonth('2026-01')).toBe('2025-12');
+  });
+});
+
+describe('nextYearMonth', () => {
+  it('通常の月は月を1つ進める', () => {
+    expect(nextYearMonth('2026-07')).toBe('2026-08');
+  });
+
+  it('12月は翌年1月にロールオーバーする', () => {
+    expect(nextYearMonth('2026-12')).toBe('2027-01');
   });
 });
 
@@ -91,22 +101,6 @@ describe('addMonthsToDate', () => {
 
   it('月末日は繰り上がった月の日数に応じて正規化される', () => {
     expect(addMonthsToDate('2026-01-31', 1)).toBe('2026-03-03');
-  });
-});
-
-describe('laterDateString', () => {
-  it('両方指定されている場合は遅い方を返す', () => {
-    expect(laterDateString('2026-01-01', '2026-04-01')).toBe('2026-04-01');
-    expect(laterDateString('2026-04-01', '2026-01-01')).toBe('2026-04-01');
-  });
-
-  it('片方が undefined の場合はもう片方を返す', () => {
-    expect(laterDateString(undefined, '2026-04-01')).toBe('2026-04-01');
-    expect(laterDateString('2026-04-01', undefined)).toBe('2026-04-01');
-  });
-
-  it('両方 undefined の場合は undefined を返す', () => {
-    expect(laterDateString(undefined, undefined)).toBeUndefined();
   });
 });
 
