@@ -1,54 +1,24 @@
+import { useMemo } from 'react';
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Legend,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 import type { TrendGranularity, TrendPoint } from '@household/shared';
-import { formatPeriodLabel, formatPeriodTick } from '@/lib/date';
-import { formatManYenTick, formatYen } from '@/lib/format';
+import { formatPeriodTick } from '@/lib/date';
+import { formatManYenTick } from '@/lib/format';
 import { Skeleton } from '@/components/ui/skeleton';
+import { BAR_SKELETON_HEIGHTS, CustomTooltip } from '@/components/charts/TrendChart';
 
-export const BAR_SKELETON_HEIGHTS = [55, 80, 40, 95, 60, 75, 45];
-
-export function CustomTooltip({
-  active,
-  payload,
-  label,
-  granularity,
-}: {
-  active?: boolean;
-  payload?: { name: string; value: number; color: string }[];
-  label?: string;
-  granularity: TrendGranularity;
-}) {
-  if (!active || !payload || payload.length === 0) return null;
-  return (
-    <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
-      <p className="mb-1 font-medium">
-        {label !== undefined ? formatPeriodLabel(label, granularity) : ''}
-      </p>
-      {payload.map((entry) => (
-        <p key={entry.name} className="flex items-center gap-2">
-          <span
-            className="inline-block size-2 rounded-full"
-            style={{ backgroundColor: entry.color }}
-            aria-hidden="true"
-          />
-          <span className="text-muted-foreground">{entry.name}</span>
-          <span className="ml-auto font-medium tabular-nums">{formatYen(entry.value)}</span>
-        </p>
-      ))}
-    </div>
-  );
-}
-
-/** 日/週/月/年の支出推移グラフ（expense のみ。transfer は含まない） */
-export function TrendChart({
+/** 月/年の収支推移グラフ。ゼロ基準線を境に、収入をプラス方向（青）、支出をマイナス方向（赤）に
+ * 積み上げた発散型（diverging）棒グラフとして1期間1本で表示する（transfer は含まない）。 */
+export function IncomeExpenseTrendChart({
   data,
   granularity,
   isLoading,
@@ -57,12 +27,22 @@ export function TrendChart({
   granularity: TrendGranularity;
   isLoading?: boolean;
 }) {
+  const chartData = useMemo(
+    () =>
+      data.map((point) => ({
+        period: point.period,
+        income: point.income,
+        expenseNegated: -point.expense,
+      })),
+    [data],
+  );
+
   if (isLoading) {
     return (
       <div
         className="flex h-64 w-full items-end gap-3 px-1"
         role="img"
-        aria-label="支出推移グラフを読み込み中"
+        aria-label="収支推移グラフを読み込み中"
         aria-busy="true"
       >
         {BAR_SKELETON_HEIGHTS.map((height, i) => (
@@ -84,9 +64,9 @@ export function TrendChart({
   }
 
   return (
-    <div className="h-64 w-full" role="img" aria-label="支出推移グラフ">
+    <div className="h-64 w-full" role="img" aria-label="収支推移グラフ">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} barGap={4} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <BarChart data={chartData} barGap={4} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
           <XAxis
             dataKey="period"
@@ -104,6 +84,7 @@ export function TrendChart({
             width={56}
             tickFormatter={formatManYenTick}
           />
+          <ReferenceLine y={0} stroke="var(--chart-axis)" />
           <Tooltip
             content={<CustomTooltip granularity={granularity} />}
             cursor={{ fill: 'var(--muted)', opacity: 0.4 }}
@@ -114,10 +95,19 @@ export function TrendChart({
             iconSize={8}
           />
           <Bar
-            dataKey="expense"
+            dataKey="income"
+            name="収入"
+            fill="var(--series-income)"
+            stackId="net"
+            radius={[4, 4, 0, 0]}
+            maxBarSize={28}
+          />
+          <Bar
+            dataKey="expenseNegated"
             name="支出"
             fill="var(--series-expense)"
-            radius={[4, 4, 0, 0]}
+            stackId="net"
+            radius={[0, 0, 4, 4]}
             maxBarSize={28}
           />
         </BarChart>

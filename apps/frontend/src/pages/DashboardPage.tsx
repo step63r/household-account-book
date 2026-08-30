@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { MonthNavigator } from '@/components/MonthNavigator';
 import { TrendChart } from '@/components/charts/TrendChart';
+import { IncomeExpenseTrendChart } from '@/components/charts/IncomeExpenseTrendChart';
 import { AssetFormationChart } from '@/components/charts/AssetFormationChart';
 import { BudgetVarianceList } from '@/components/charts/BudgetVarianceList';
 import { CategoryBreakdownChart } from '@/components/charts/CategoryBreakdownChart';
@@ -39,13 +40,17 @@ const GRANULARITY_LABEL: Record<TrendGranularity, string> = {
   year: '年次',
 };
 
+// 支出推移（短期の支出動向）は日次/週次のみ、収支推移（長期の収支バランス）は月次/年次のみに絞る。
+const EXPENSE_TREND_GRANULARITIES: TrendGranularity[] = ['day', 'week'];
+const INCOME_EXPENSE_TREND_GRANULARITIES: TrendGranularity[] = ['month', 'year'];
+
 // EMPTY_ARRAY（readonly never[]）はコンポーネントのprops（mutableな配列型）に直接渡せないため、
 // チャート/一覧コンポーネントへのフォールバック用に型付きの空配列を用意する。
 const EMPTY_TREND_POINTS: TrendPoint[] = [];
 const EMPTY_BUDGET_VARIANCE_ROWS: BudgetVarianceRow[] = [];
 const EMPTY_CATEGORY_PIVOT_ROWS: CategoryPivotRow[] = [];
 
-/** 収支推移グラフの粒度に応じた取得範囲。日/週は選択月、月は選択年、年は選択に関わらず全履歴（無料プランはfloorDate以降に制限）。
+/** 支出推移・収支推移グラフの粒度に応じた取得範囲。日/週は選択月、月は選択年、年は選択に関わらず全履歴（無料プランはfloorDate以降に制限）。
  * floorDateは無料プランの参照可能期間下限（YYYY-MM-DD、有料プランはundefined=無制限）。 */
 function trendRangeFor(
   granularity: TrendGranularity,
@@ -62,7 +67,9 @@ function trendRangeFor(
 }
 
 export default function DashboardPage() {
-  const [granularity, setGranularity] = useState<TrendGranularity>('day');
+  const [expenseGranularity, setExpenseGranularity] = useState<TrendGranularity>('day');
+  const [incomeExpenseGranularity, setIncomeExpenseGranularity] =
+    useState<TrendGranularity>('month');
   const [selectedYearMonth, setSelectedYearMonth] = useState(currentYearMonthJst());
   const yearMonth = selectedYearMonth;
   const previousMonth = previousYearMonth(yearMonth);
@@ -74,17 +81,35 @@ export default function DashboardPage() {
   const planFloorDate =
     plan === 'free' ? resolvePlanFloorDateString('free', new Date()) : undefined;
 
-  const trendRange = trendRangeFor(granularity, selectedYearMonth, planFloorDate);
-  const trendQuery = useQuery({
+  const expenseTrendRange = trendRangeFor(expenseGranularity, selectedYearMonth, planFloorDate);
+  const expenseTrendQuery = useQuery({
     queryKey: [
       'aggregation',
       'trend',
-      granularity,
-      trendRange.from ?? null,
-      trendRange.to,
+      expenseGranularity,
+      expenseTrendRange.from ?? null,
+      expenseTrendRange.to,
       'excludeFixed',
     ],
-    queryFn: async () => getTrend({ granularity, ...trendRange, excludeFixed: true }),
+    queryFn: async () =>
+      getTrend({ granularity: expenseGranularity, ...expenseTrendRange, excludeFixed: true }),
+  });
+
+  const incomeExpenseTrendRange = trendRangeFor(
+    incomeExpenseGranularity,
+    selectedYearMonth,
+    planFloorDate,
+  );
+  const incomeExpenseTrendQuery = useQuery({
+    queryKey: [
+      'aggregation',
+      'trend',
+      incomeExpenseGranularity,
+      incomeExpenseTrendRange.from ?? null,
+      incomeExpenseTrendRange.to,
+    ],
+    queryFn: async () =>
+      getTrend({ granularity: incomeExpenseGranularity, ...incomeExpenseTrendRange }),
   });
 
   const kpiRangeTo = monthDateRange(yearMonth).to;
@@ -110,7 +135,8 @@ export default function DashboardPage() {
   });
 
   const isInitialLoading =
-    trendQuery.isPending ||
+    expenseTrendQuery.isPending ||
+    incomeExpenseTrendQuery.isPending ||
     kpiTrendQuery.isPending ||
     categoryPivotQuery.isPending ||
     budgetVarianceQuery.isPending ||
@@ -119,9 +145,14 @@ export default function DashboardPage() {
   // 無料プランと判明している間、または期間制限をすり抜けて403 PLAN_RESTRICTEDが返ってきた場合に案内カードを出す
   const planRestricted =
     plan === 'free' ||
-    [trendQuery, kpiTrendQuery, categoryPivotQuery, budgetVarianceQuery, assetFormationQuery].some(
-      (query) => query.isError && isPlanRestrictedError(query.error),
-    );
+    [
+      expenseTrendQuery,
+      incomeExpenseTrendQuery,
+      kpiTrendQuery,
+      categoryPivotQuery,
+      budgetVarianceQuery,
+      assetFormationQuery,
+    ].some((query) => query.isError && isPlanRestrictedError(query.error));
 
   const assetFormationData = useMemo(
     () => toCumulativeSeries(assetFormationQuery.data ?? EMPTY_ARRAY),
@@ -164,9 +195,12 @@ export default function DashboardPage() {
               <CardTitle>支出推移</CardTitle>
               <CardDescription>支出の推移（振替・固定費は含みません）</CardDescription>
             </div>
-            <Tabs value={granularity} onValueChange={(v) => setGranularity(v as TrendGranularity)}>
+            <Tabs
+              value={expenseGranularity}
+              onValueChange={(v) => setExpenseGranularity(v as TrendGranularity)}
+            >
               <TabsList>
-                {(Object.keys(GRANULARITY_LABEL) as TrendGranularity[]).map((g) => (
+                {EXPENSE_TREND_GRANULARITIES.map((g) => (
                   <TabsTrigger key={g} value={g}>
                     {GRANULARITY_LABEL[g]}
                   </TabsTrigger>
@@ -177,8 +211,38 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <TrendChart
-            data={trendQuery.data ?? EMPTY_TREND_POINTS}
-            granularity={granularity}
+            data={expenseTrendQuery.data ?? EMPTY_TREND_POINTS}
+            granularity={expenseGranularity}
+            isLoading={isInitialLoading}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle>収支推移</CardTitle>
+              <CardDescription>収入・支出の推移（振替は含みません）</CardDescription>
+            </div>
+            <Tabs
+              value={incomeExpenseGranularity}
+              onValueChange={(v) => setIncomeExpenseGranularity(v as TrendGranularity)}
+            >
+              <TabsList>
+                {INCOME_EXPENSE_TREND_GRANULARITIES.map((g) => (
+                  <TabsTrigger key={g} value={g}>
+                    {GRANULARITY_LABEL[g]}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <IncomeExpenseTrendChart
+            data={incomeExpenseTrendQuery.data ?? EMPTY_TREND_POINTS}
+            granularity={incomeExpenseGranularity}
             isLoading={isInitialLoading}
           />
         </CardContent>
