@@ -66,7 +66,14 @@ export function IncomeExpenseTrendChart({
   return (
     <div className="h-64 w-full" role="img" aria-label="収支推移グラフ">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={chartData} barGap={4} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        {/* stackOffset="sign" が無いと同じstackId内の正負の値が単純に加算され、
+            マイナス側がゼロ基準に分かれず正の棒に重なって表示されてしまう */}
+        <BarChart
+          data={chartData}
+          stackOffset="sign"
+          barGap={4}
+          margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+        >
           <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
           <XAxis
             dataKey="period"
