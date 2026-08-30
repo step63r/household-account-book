@@ -161,8 +161,8 @@ export default function DashboardPage() {
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <CardTitle>収支推移</CardTitle>
-              <CardDescription>収入・支出の推移（振替・固定費は含みません）</CardDescription>
+              <CardTitle>支出推移</CardTitle>
+              <CardDescription>支出の推移（振替・固定費は含みません）</CardDescription>
             </div>
             <Tabs value={granularity} onValueChange={(v) => setGranularity(v as TrendGranularity)}>
               <TabsList>

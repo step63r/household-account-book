@@ -47,7 +47,7 @@ function CustomTooltip({
   );
 }
 
-/** 日/週/月の収支推移グラフ（income/expense のみ。transfer は含まない） */
+/** 日/週/月/年の支出推移グラフ（expense のみ。transfer は含まない） */
 export function TrendChart({
   data,
   granularity,
@@ -62,7 +62,7 @@ export function TrendChart({
       <div
         className="flex h-64 w-full items-end gap-3 px-1"
         role="img"
-        aria-label="収支推移グラフを読み込み中"
+        aria-label="支出推移グラフを読み込み中"
         aria-busy="true"
       >
         {BAR_SKELETON_HEIGHTS.map((height, i) => (
@@ -84,7 +84,7 @@ export function TrendChart({
   }
 
   return (
-    <div className="h-64 w-full" role="img" aria-label="収支推移グラフ">
+    <div className="h-64 w-full" role="img" aria-label="支出推移グラフ">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} barGap={4} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
@@ -112,13 +112,6 @@ export function TrendChart({
             wrapperStyle={{ fontSize: 12, color: 'var(--chart-muted)' }}
             iconType="circle"
             iconSize={8}
-          />
-          <Bar
-            dataKey="income"
-            name="収入"
-            fill="var(--series-income)"
-            radius={[4, 4, 0, 0]}
-            maxBarSize={28}
           />
           <Bar
             dataKey="expense"
