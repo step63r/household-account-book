@@ -114,7 +114,9 @@ export function IncomeExpenseTrendChart({
             name="支出"
             fill="var(--series-expense)"
             stackId="net"
-            radius={[0, 0, 4, 4]}
+            // 負の値のバーはRechartsがradius配列の丸め位置を反転して描画するため、
+            // 収入と同じ[4,4,0,0]を指定することでゼロ基準線側が角、先端側が丸くなる
+            radius={[4, 4, 0, 0]}
             maxBarSize={28}
           />
         </BarChart>
