@@ -100,6 +100,50 @@ describe('createTransaction', () => {
     expect(transaction.amount).toBe(1200);
     await expect(repository.getById('user-1', transaction.id)).resolves.toEqual(transaction);
   });
+
+  it('rejects a zero amount', async () => {
+    const repository = new FakeTransactionRepository();
+
+    await expect(
+      createTransaction(repository, 'user-1', 'creator-1', { ...validExpense, amount: 0 }),
+    ).rejects.toThrow(ZodError);
+  });
+
+  it('rejects an expense with a negative amount', async () => {
+    const repository = new FakeTransactionRepository();
+
+    await expect(
+      createTransaction(repository, 'user-1', 'creator-1', { ...validExpense, amount: -1200 }),
+    ).rejects.toThrow(HttpError);
+  });
+
+  it('rejects an income with a negative amount', async () => {
+    const repository = new FakeTransactionRepository();
+
+    await expect(
+      createTransaction(repository, 'user-1', 'creator-1', {
+        date: '2026-07-10',
+        type: 'income',
+        categoryId: null,
+        amount: -300000,
+        incomeSource: '給与',
+      }),
+    ).rejects.toThrow(HttpError);
+  });
+
+  it('accepts a transfer with a negative amount (解約・引き出し)', async () => {
+    const repository = new FakeTransactionRepository();
+
+    const transaction = await createTransaction(repository, 'user-1', 'creator-1', {
+      date: '2026-07-10',
+      type: 'transfer',
+      categoryId: null,
+      amount: -5000,
+      transferLabel: '生命保険',
+    });
+
+    expect(transaction.amount).toBe(-5000);
+  });
 });
 
 describe('listTransactions', () => {
@@ -165,6 +209,32 @@ describe('updateTransaction', () => {
     await expect(
       updateTransaction(repository, 'user-1', transaction.id, { type: 'transfer' }),
     ).rejects.toThrow(HttpError);
+  });
+
+  it('rejects a merged result that violates the amount sign rule', async () => {
+    const repository = new FakeTransactionRepository();
+    const transaction = await createTransaction(repository, 'user-1', 'creator-1', validExpense);
+
+    await expect(
+      updateTransaction(repository, 'user-1', transaction.id, { amount: -3000 }),
+    ).rejects.toThrow(HttpError);
+  });
+
+  it('accepts updating a transfer amount to negative (解約として更新)', async () => {
+    const repository = new FakeTransactionRepository();
+    const transaction = await createTransaction(repository, 'user-1', 'creator-1', {
+      date: '2026-07-10',
+      type: 'transfer',
+      categoryId: null,
+      amount: 5000,
+      transferLabel: 'NISA',
+    });
+
+    const updated = await updateTransaction(repository, 'user-1', transaction.id, {
+      amount: -5000,
+    });
+
+    expect(updated.amount).toBe(-5000);
   });
 
   it('updates only the provided fields and bumps updatedAt', async () => {

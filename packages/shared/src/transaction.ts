@@ -17,8 +17,15 @@ export const transactionSchema = z.object({
   type: transactionTypeSchema,
   /** transfer/income では未設定でもよい（費目マスタは支出専用のため） */
   categoryId: z.string().nullable(),
-  /** 円単位の整数 */
-  amount: z.number().int().positive(),
+  /**
+   * 円単位の整数。income/expense は正の整数のみ許可し、transfer は符号を問わず非ゼロの整数を
+   * 許可する（正=積立などの入金、負=解約・引き出し）。type別の符号制約は categoryId の
+   * type別必須/null制約と同じ理由でスキーマではなくサービス層（assertAmountSignRule）で課す。
+   */
+  amount: z
+    .number()
+    .int()
+    .refine((value) => value !== 0, { message: 'amount must not be zero' }),
   /** 摘要 */
   memo: z.string().max(200).optional(),
   /** type=transfer のときの積立先ラベル（例: NISA、生命保険、財形貯蓄） */

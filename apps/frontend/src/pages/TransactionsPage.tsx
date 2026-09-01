@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { AmountInput } from '@/components/ui/amount-input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -35,6 +36,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -69,6 +71,11 @@ import {
   todayJst,
 } from '@/lib/date';
 import { groupTransactionsByDate } from '@/lib/transactionGrouping';
+import {
+  applyTransferDirection,
+  transferDirectionOf,
+  type TransferDirection,
+} from '@/lib/transferAmount';
 
 const TYPE_LABEL: Record<TransactionType, string> = {
   income: '収入',
@@ -89,7 +96,10 @@ const yenFormatter = new Intl.NumberFormat('ja-JP', {
 });
 
 function getTransactionCategoryLabel(tx: Transaction, categoryById: Map<string, Category>): string {
-  if (tx.type === 'transfer') return tx.transferLabel ?? '-';
+  if (tx.type === 'transfer') {
+    const label = tx.transferLabel ?? '-';
+    return transferDirectionOf(tx.amount) === 'withdrawal' ? `${label}（解約・引き出し）` : label;
+  }
   if (tx.type === 'income') return tx.incomeSource ?? '未分類';
   return (tx.categoryId && categoryById.get(tx.categoryId)?.name) || '未分類';
 }
@@ -140,17 +150,24 @@ function defaultFormValues(transaction: Transaction | null): CreateTransactionIn
     date: transaction.date,
     type: transaction.type,
     categoryId: transaction.categoryId,
-    amount: transaction.amount,
+    amount: Math.abs(transaction.amount),
     memo: transaction.memo ?? '',
     transferLabel: transaction.transferLabel ?? '',
     incomeSource: transaction.incomeSource ?? '',
   };
 }
 
-function buildTransactionInput(values: CreateTransactionInput): CreateTransactionInput {
+function buildTransactionInput(
+  values: CreateTransactionInput,
+  transferDirection: TransferDirection,
+): CreateTransactionInput {
   return {
     ...values,
     categoryId: values.type === 'expense' ? values.categoryId : null,
+    amount:
+      values.type === 'transfer'
+        ? applyTransferDirection(values.amount, transferDirection)
+        : values.amount,
     memo: values.memo || undefined,
     transferLabel: values.type === 'transfer' ? values.transferLabel || undefined : undefined,
     incomeSource: values.type === 'income' ? values.incomeSource || undefined : undefined,
@@ -280,8 +297,8 @@ export default function TransactionsPage() {
       ) {
         return false;
       }
-      if (!Number.isNaN(amountMin) && tx.amount < amountMin) return false;
-      if (!Number.isNaN(amountMax) && tx.amount > amountMax) return false;
+      if (!Number.isNaN(amountMin) && Math.abs(tx.amount) < amountMin) return false;
+      if (!Number.isNaN(amountMax) && Math.abs(tx.amount) > amountMax) return false;
       if (trimmedMemoQuery !== '' && !(tx.memo ?? '').includes(trimmedMemoQuery)) return false;
       return true;
     });
@@ -616,6 +633,9 @@ function TransactionFormDialog({
   });
 
   const [typeValue, setTypeValue] = useState<TransactionType>(transaction?.type ?? 'expense');
+  const [transferDirection, setTransferDirection] = useState<TransferDirection>(
+    transferDirectionOf(transaction?.amount ?? 0),
+  );
   const [customIncomeSource, setCustomIncomeSource] = useState(
     isCustomIncomeSource(transaction?.incomeSource ?? ''),
   );
@@ -629,6 +649,7 @@ function TransactionFormDialog({
     if (open) return;
     form.reset(defaultFormValues(transaction));
     setTypeValue(transaction?.type ?? 'expense');
+    setTransferDirection(transferDirectionOf(transaction?.amount ?? 0));
     setCustomIncomeSource(isCustomIncomeSource(transaction?.incomeSource ?? ''));
     setPendingAction(null);
   }, [open, transaction, form]);
@@ -650,7 +671,7 @@ function TransactionFormDialog({
   });
 
   const handleSubmit = form.handleSubmit((values) => {
-    const input = buildTransactionInput(values);
+    const input = buildTransactionInput(values, transferDirection);
     setPendingAction('submit');
     if (transaction) {
       updateMutation.mutate(
@@ -663,7 +684,7 @@ function TransactionFormDialog({
   });
 
   const handleContinuousSubmit = form.handleSubmit((values) => {
-    const input = buildTransactionInput(values);
+    const input = buildTransactionInput(values, transferDirection);
     setPendingAction('continuous');
     createMutation.mutate(input, {
       onSuccess: () => {
@@ -725,19 +746,38 @@ function TransactionFormDialog({
           />
 
           {typeValue === 'transfer' ? (
-            <FormField
-              control={form.control}
-              name="transferLabel"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>積立先</FormLabel>
-                  <FormControl>
-                    <Input placeholder="例: つみたてNISA" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <>
+              <div className="grid gap-2">
+                <Label htmlFor="transfer-direction">方向</Label>
+                <Select
+                  value={transferDirection}
+                  onValueChange={(v) => setTransferDirection(v as TransferDirection)}
+                >
+                  <SelectTrigger id="transfer-direction" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="deposit">積立・入金</SelectItem>
+                    <SelectItem value="withdrawal">解約・引き出し</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <FormField
+                control={form.control}
+                name="transferLabel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {transferDirection === 'withdrawal' ? '解約対象' : '積立先'}
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="例: つみたてNISA" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </>
           ) : typeValue === 'income' ? (
             <FormField
               control={form.control}
@@ -826,6 +866,9 @@ function TransactionFormDialog({
                 <FormControl>
                   <AmountInput {...field} />
                 </FormControl>
+                {typeValue === 'transfer' && transferDirection === 'withdrawal' ? (
+                  <FormDescription>解約返戻金の全額を入力してください</FormDescription>
+                ) : null}
                 <FormMessage />
               </FormItem>
             )}

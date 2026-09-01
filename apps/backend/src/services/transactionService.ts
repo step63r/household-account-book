@@ -29,6 +29,17 @@ function assertCategoryIdRule(type: TransactionType, categoryId: string | null):
   }
 }
 
+/**
+ * income/expense の amount は正の整数のみ許可する。transfer は解約・引き出し（マイナス）も
+ * 業務上正当なため符号を問わない。スキーマ側は type を問わず非ゼロ整数まで緩めてあるので、
+ * income/expense の正数制約はここで課す（assertCategoryIdRule と同じ責務分担）。
+ */
+function assertAmountSignRule(type: TransactionType, amount: number): void {
+  if (type !== 'transfer' && amount < 0) {
+    throw new HttpError(400, `amount must be positive when type is "${type}"`);
+  }
+}
+
 export async function listTransactions(
   repository: TransactionRepository,
   householdId: string,
@@ -57,6 +68,7 @@ export async function createTransaction(
 ): Promise<Transaction> {
   const input = createTransactionInputSchema.parse(rawInput);
   assertCategoryIdRule(input.type, input.categoryId);
+  assertAmountSignRule(input.type, input.amount);
   assertWithinPlanWindow(plan, input.date);
 
   const now = new Date().toISOString();
@@ -96,6 +108,7 @@ export async function updateTransaction(
     updatedAt: new Date().toISOString(),
   };
   assertCategoryIdRule(updated.type, updated.categoryId);
+  assertAmountSignRule(updated.type, updated.amount);
   // ...and reject moving one into that window via a `date` change.
   assertWithinPlanWindow(plan, updated.date);
 

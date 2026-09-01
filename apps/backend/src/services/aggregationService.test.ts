@@ -89,6 +89,25 @@ describe('getTrend', () => {
     expect(trend).toEqual([{ period: '2026-07-10', income: 5000, expense: 1200, transfer: 10000 }]);
   });
 
+  it('nets a negative transfer (解約・引き出し) against positive transfers in the same period', async () => {
+    const repository = new FakeTransactionRepository();
+    const categoryRepository = new FakeCategoryRepository();
+    await repository.put(
+      makeTransaction({ date: '2026-07-10', type: 'transfer', amount: 10000, categoryId: null }),
+    );
+    await repository.put(
+      makeTransaction({ date: '2026-07-10', type: 'transfer', amount: -3000, categoryId: null }),
+    );
+
+    const trend = await getTrend(repository, categoryRepository, 'user-1', {
+      granularity: 'day',
+      from: '2026-07-01',
+      to: '2026-07-31',
+    });
+
+    expect(trend).toEqual([{ period: '2026-07-10', income: 0, expense: 0, transfer: 7000 }]);
+  });
+
   it('buckets by month when granularity is month', async () => {
     const repository = new FakeTransactionRepository();
     const categoryRepository = new FakeCategoryRepository();
