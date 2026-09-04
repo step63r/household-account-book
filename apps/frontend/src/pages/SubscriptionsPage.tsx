@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -129,6 +129,7 @@ export default function SubscriptionsPage() {
         </DialogTrigger>
         <SubscriptionFormDialog
           key={dialogState.subscription?.id ?? 'new'}
+          open={dialogState.open}
           subscription={dialogState.subscription}
           categories={categories}
           pending={upsertMutation.isPending}
@@ -222,11 +223,13 @@ function defaultFormValues(subscription: Subscription | null): CreateSubscriptio
 }
 
 function SubscriptionFormDialog({
+  open,
   subscription,
   categories,
   pending,
   onSubmit,
 }: {
+  open: boolean;
   subscription: Subscription | null;
   categories: readonly Category[];
   pending: boolean;
@@ -236,6 +239,16 @@ function SubscriptionFormDialog({
     resolver: zodResolver(createSubscriptionInputSchema),
     defaultValues: defaultFormValues(subscription),
   });
+
+  // 登録・キャンセルのいずれで閉じても、ダイアログはkey固定（'new'）のため
+  // コンポーネント自体は再マウントされない。開くたびに明示的にリセットして
+  // 前回入力した値が残らないようにする。
+  useEffect(() => {
+    if (open) {
+      form.reset(defaultFormValues(subscription));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const frequencyValue = useWatch({ control: form.control, name: 'frequency' });
 

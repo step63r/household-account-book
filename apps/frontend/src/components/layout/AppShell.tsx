@@ -3,13 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { Menu, Wallet } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Footer } from './Footer';
 import { MOBILE_TAB_ITEMS, NAV_ITEMS } from './nav-items';
 
@@ -58,38 +52,37 @@ export function AppShell() {
         </div>
       </main>
 
-      {/* モバイル: 下部タブナビゲーション（最低限のみ。残りはハンバーガーメニューから） */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
+      {/* モバイル: 下部タブナビゲーション（アイコンのみ・最低限。残りはハンバーガーメニューから） */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
         {MOBILE_TAB_ITEMS.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
+            aria-label={item.label}
             className={({ isActive }) =>
               cn(
-                'flex flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium',
+                'flex items-center justify-center py-3',
                 isActive ? 'text-primary' : 'text-muted-foreground',
               )
             }
           >
-            <item.icon className="size-5" aria-hidden="true" />
-            {item.label}
+            <item.icon className="size-6" aria-hidden="true" />
           </NavLink>
         ))}
-        <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
-          <DialogTrigger asChild>
+        <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+          <SheetTrigger asChild>
             <button
               type="button"
               aria-label="メニュー"
-              className="flex flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium text-muted-foreground"
+              className="flex items-center justify-center py-3 text-muted-foreground"
             >
-              <Menu className="size-5" aria-hidden="true" />
-              メニュー
+              <Menu className="size-6" aria-hidden="true" />
             </button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-xs">
-            <DialogHeader>
-              <DialogTitle>メニュー</DialogTitle>
-            </DialogHeader>
+          </SheetTrigger>
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>メニュー</SheetTitle>
+            </SheetHeader>
             <nav className="flex flex-col gap-1">
               {NAV_ITEMS.map((item) => (
                 <NavLink
@@ -110,8 +103,8 @@ export function AppShell() {
                 </NavLink>
               ))}
             </nav>
-          </DialogContent>
-        </Dialog>
+          </SheetContent>
+        </Sheet>
       </nav>
     </div>
   );

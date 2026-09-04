@@ -25,9 +25,9 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 /**
- * モバイル下部タブに常時表示する項目（最低限のみ）。全項目を並べるとiOSで折り返してしまうため、
- * 残りはハンバーガーメニュー（NAV_ITEMS全量）から遷移する設計にしている。
+ * モバイル下部タブに常時表示する項目（アイコンのみ、最低限）。残り（費目・サブスクリプション・
+ * 設定を含む全項目）はハンバーガーメニュー（NAV_ITEMS全量、ラベル付き）から遷移する設計。
  */
-export const MOBILE_TAB_ITEMS: NavItem[] = NAV_ITEMS.filter(
-  (item) => item.to !== '/subscriptions' && item.to !== '/settings',
+export const MOBILE_TAB_ITEMS: NavItem[] = NAV_ITEMS.filter((item) =>
+  ['/dashboard', '/transactions', '/budgets'].includes(item.to),
 );
