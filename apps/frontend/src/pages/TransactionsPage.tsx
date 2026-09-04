@@ -1032,11 +1032,11 @@ function SubscriptionMissingWarning({
   return (
     <Card
       className={cn(
-        'border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30',
+        'py-0 border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30',
         className,
       )}
     >
-      <CardContent className="flex items-start gap-3 py-4 text-sm">
+      <CardContent className="flex items-start gap-3 py-2.5 text-sm">
         <AlertTriangle
           className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-500"
           aria-hidden="true"
