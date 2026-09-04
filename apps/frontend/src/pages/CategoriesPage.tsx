@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Info, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   createCategoryInputSchema,
   type Category,
@@ -35,7 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { createCategory, deleteCategory, getCategories, updateCategory } from '@/lib/categories';
 import { EMPTY_ARRAY } from '@/lib/utils';
 
@@ -154,20 +154,7 @@ function CategoryGroupCard({
               <li key={c.id} className="flex items-center justify-between gap-2 py-2.5">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-medium">{c.name}</span>
-                  {c.tooltip && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:text-foreground"
-                          aria-label={`${c.name}の説明`}
-                        >
-                          <Info className="size-3.5" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>{c.tooltip}</TooltipContent>
-                    </Tooltip>
-                  )}
+                  {c.tooltip && <InfoTooltip label={`${c.name}の説明`}>{c.tooltip}</InfoTooltip>}
                 </div>
                 <div className="flex items-center gap-1">
                   <Button

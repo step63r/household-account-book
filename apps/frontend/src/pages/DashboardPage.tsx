@@ -7,12 +7,11 @@ import type {
   TrendPoint,
 } from '@household/shared';
 import { resolvePlanFloorDateString } from '@household/shared';
-import { Info } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { MonthNavigator } from '@/components/MonthNavigator';
 import { TrendChart } from '@/components/charts/TrendChart';
 import { IncomeExpenseTrendChart } from '@/components/charts/IncomeExpenseTrendChart';
@@ -195,18 +194,9 @@ export default function DashboardPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-1.5">
               <CardTitle>支出推移</CardTitle>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="text-muted-foreground hover:text-foreground"
-                    aria-label="支出推移の説明"
-                  >
-                    <Info className="size-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>支出の推移（振替・固定費は含みません）</TooltipContent>
-              </Tooltip>
+              <InfoTooltip label="支出推移の説明">
+                支出の推移（振替・固定費は含みません）
+              </InfoTooltip>
             </div>
             <Tabs
               value={expenseGranularity}
@@ -236,18 +226,7 @@ export default function DashboardPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-1.5">
               <CardTitle>収支推移</CardTitle>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="text-muted-foreground hover:text-foreground"
-                    aria-label="収支推移の説明"
-                  >
-                    <Info className="size-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>収入・支出の推移（振替は含みません）</TooltipContent>
-              </Tooltip>
+              <InfoTooltip label="収支推移の説明">収入・支出の推移（振替は含みません）</InfoTooltip>
             </div>
             <Tabs
               value={incomeExpenseGranularity}
@@ -277,20 +256,9 @@ export default function DashboardPage() {
           <CardHeader>
             <div className="flex items-center gap-1.5">
               <CardTitle>予実差（費目別）</CardTitle>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="text-muted-foreground hover:text-foreground"
-                    aria-label="予実差（費目別）の説明"
-                  >
-                    <Info className="size-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {formatYearMonth(yearMonth)} の予算に対する実績（変動費のみ）
-                </TooltipContent>
-              </Tooltip>
+              <InfoTooltip label="予実差（費目別）の説明">
+                {formatYearMonth(yearMonth)} の予算に対する実績（変動費のみ）
+              </InfoTooltip>
             </div>
           </CardHeader>
           <CardContent>
@@ -306,20 +274,9 @@ export default function DashboardPage() {
           <CardHeader>
             <div className="flex items-center gap-1.5">
               <CardTitle>費目別支出の内訳</CardTitle>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="text-muted-foreground hover:text-foreground"
-                    aria-label="費目別支出の内訳の説明"
-                  >
-                    <Info className="size-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {formatYearMonth(yearMonth)} の支出（費目別・変動費のみ）
-                </TooltipContent>
-              </Tooltip>
+              <InfoTooltip label="費目別支出の内訳の説明">
+                {formatYearMonth(yearMonth)} の支出（費目別・変動費のみ）
+              </InfoTooltip>
             </div>
           </CardHeader>
           <CardContent>
@@ -335,20 +292,9 @@ export default function DashboardPage() {
           <CardHeader>
             <div className="flex items-center gap-1.5">
               <CardTitle>資産形成推移</CardTitle>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="text-muted-foreground hover:text-foreground"
-                    aria-label="資産形成推移の説明"
-                  >
-                    <Info className="size-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  積立・投資・保険・NISA拠出などの振替のみを集計（収支には含みません）
-                </TooltipContent>
-              </Tooltip>
+              <InfoTooltip label="資産形成推移の説明">
+                積立・投資・保険・NISA拠出などの振替のみを集計（収支には含みません）
+              </InfoTooltip>
             </div>
           </CardHeader>
           <CardContent>
