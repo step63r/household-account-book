@@ -87,6 +87,34 @@ function buildRoutes(props: ApiStackProps): RouteDef[] {
       handlerFile: 'deleteCategory',
       dynamoActions: ['dynamodb:GetItem', 'dynamodb:DeleteItem'],
     },
+    // Subscriptions - apps/backend/src/{handlers,services}/*Subscription*.ts. No preset seeding
+    // (unlike categories), so no BatchWriteItem and POST needs no Query for existing items.
+    {
+      method: apigwv2.HttpMethod.GET,
+      path: '/subscriptions',
+      handlerFile: 'listSubscriptions',
+      // GetItem (household-sharing) = getUserContext's householdId lookup, see listCategories above.
+      dynamoActions: ['dynamodb:Query', 'dynamodb:GetItem'],
+    },
+    {
+      method: apigwv2.HttpMethod.POST,
+      path: '/subscriptions',
+      handlerFile: 'createSubscription',
+      // GetItem (household-sharing) = getUserContext's householdId lookup, see above.
+      dynamoActions: ['dynamodb:PutItem', 'dynamodb:GetItem'],
+    },
+    {
+      method: apigwv2.HttpMethod.PUT,
+      path: '/subscriptions/{id}',
+      handlerFile: 'updateSubscription',
+      dynamoActions: ['dynamodb:GetItem', 'dynamodb:PutItem'],
+    },
+    {
+      method: apigwv2.HttpMethod.DELETE,
+      path: '/subscriptions/{id}',
+      handlerFile: 'deleteSubscription',
+      dynamoActions: ['dynamodb:GetItem', 'dynamodb:DeleteItem'],
+    },
     // Transactions - handlers currently stubbed (501); actions per each file's TODO comment
     {
       method: apigwv2.HttpMethod.GET,

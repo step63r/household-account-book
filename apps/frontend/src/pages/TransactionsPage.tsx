@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -7,13 +7,14 @@ import {
   useQueryClient,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import { ChevronDown, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Pencil, Plus, Trash2, X } from 'lucide-react';
 import {
   createTransactionInputSchema,
   INCOME_SOURCE_PRESETS,
   resolvePlanFloorDateString,
   type Category,
   type CreateTransactionInput,
+  type Subscription,
   type Transaction,
   type TransactionType,
 } from '@household/shared';
@@ -53,6 +54,7 @@ import { MultiSelectFilter } from '@/components/ui/multi-select-filter';
 import { MonthNavigator } from '@/components/MonthNavigator';
 import { PlanRestrictionNotice } from '@/components/plan/PlanRestrictionNotice';
 import { getCategories } from '@/lib/categories';
+import { getSubscriptions } from '@/lib/subscriptions';
 import {
   createTransaction,
   deleteTransaction,
@@ -144,6 +146,7 @@ function defaultFormValues(transaction: Transaction | null): CreateTransactionIn
       memo: '',
       transferLabel: '',
       incomeSource: '',
+      subscriptionId: null,
     };
   }
   return {
@@ -154,6 +157,7 @@ function defaultFormValues(transaction: Transaction | null): CreateTransactionIn
     memo: transaction.memo ?? '',
     transferLabel: transaction.transferLabel ?? '',
     incomeSource: transaction.incomeSource ?? '',
+    subscriptionId: transaction.subscriptionId ?? null,
   };
 }
 
@@ -171,6 +175,7 @@ function buildTransactionInput(
     memo: values.memo || undefined,
     transferLabel: values.type === 'transfer' ? values.transferLabel || undefined : undefined,
     incomeSource: values.type === 'income' ? values.incomeSource || undefined : undefined,
+    subscriptionId: values.type === 'expense' ? (values.subscriptionId ?? null) : null,
   };
 }
 
@@ -210,9 +215,31 @@ export default function TransactionsPage() {
     queryKey: ['categories'],
     queryFn: async () => getCategories(),
   });
+  const subscriptionsQuery = useQuery({
+    queryKey: ['subscriptions'],
+    queryFn: async () => getSubscriptions(),
+  });
   const transactions = transactionsQuery.data ?? EMPTY_ARRAY;
   const categories = categoriesQuery.data ?? EMPTY_ARRAY;
+  const subscriptions = subscriptionsQuery.data ?? EMPTY_ARRAY;
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+
+  // 当月（選択月）にまだ記録されていない有効なサブスクリプション（年次は請求月のみ判定対象）
+  const missingSubscriptions = useMemo(() => {
+    const recordedIds = new Set(
+      transactions.map((tx) => tx.subscriptionId).filter((id): id is string => Boolean(id)),
+    );
+    const month = Number(selectedYearMonth.split('-')[1]);
+    return subscriptions.filter((sub) => {
+      if (!sub.isActive) return false;
+      if (sub.frequency === 'yearly' && sub.billingMonth !== month) return false;
+      return !recordedIds.has(sub.id);
+    });
+  }, [subscriptions, transactions, selectedYearMonth]);
+
+  const [dismissedMonth, setDismissedMonth] = useState<string | null>(null);
+  const showSubscriptionWarning =
+    missingSubscriptions.length > 0 && dismissedMonth !== selectedYearMonth;
 
   // 無料プランと判明している間、または期間制限をすり抜けて403 PLAN_RESTRICTEDが返ってきた場合に案内カードを出す
   const planRestricted =
@@ -330,6 +357,7 @@ export default function TransactionsPage() {
           open={dialogState.open}
           transaction={dialogState.transaction}
           categories={categories}
+          subscriptions={subscriptions}
           createMutation={createMutation}
           updateMutation={updateMutation}
           onOpenChange={(open) => setDialogState((s) => ({ ...s, open }))}
@@ -417,6 +445,14 @@ export default function TransactionsPage() {
               </div>
             )}
           </div>
+
+          {showSubscriptionWarning && (
+            <SubscriptionMissingWarning
+              subscriptions={missingSubscriptions}
+              onDismiss={() => setDismissedMonth(selectedYearMonth)}
+              className="mb-4"
+            />
+          )}
 
           {transactionsQuery.isPending ? (
             <TransactionsSkeleton />
@@ -612,6 +648,7 @@ function TransactionFormDialog({
   open,
   transaction,
   categories,
+  subscriptions,
   createMutation,
   updateMutation,
   onOpenChange,
@@ -619,6 +656,7 @@ function TransactionFormDialog({
   open: boolean;
   transaction: Transaction | null;
   categories: readonly Category[];
+  subscriptions: readonly Subscription[];
   createMutation: UseMutationResult<Transaction, Error, CreateTransactionInput>;
   updateMutation: UseMutationResult<
     Transaction,
@@ -658,6 +696,32 @@ function TransactionFormDialog({
   const categoryIdValue = useWatch({ control: form.control, name: 'categoryId' });
   const memoSuggestionCategoryId =
     typeValue === 'expense' ? (categoryIdValue ?? undefined) : undefined;
+
+  // 費目を切り替えたら、古い費目に紐づいたサブスクリプションの紐付けを引き継がない
+  // （初回マウント時は編集対象の既存subscriptionIdを保持したいため、値が実際に変化した時のみリセットする）
+  const previousCategoryIdRef = useRef(categoryIdValue);
+  useEffect(() => {
+    if (previousCategoryIdRef.current !== categoryIdValue) {
+      form.setValue('subscriptionId', null);
+      previousCategoryIdRef.current = categoryIdValue;
+    }
+  }, [categoryIdValue, form]);
+
+  const matchingSubscriptions = useMemo(
+    () =>
+      typeValue === 'expense' && categoryIdValue
+        ? subscriptions.filter((sub) => sub.isActive && sub.categoryId === categoryIdValue)
+        : EMPTY_ARRAY,
+    [subscriptions, typeValue, categoryIdValue],
+  );
+
+  function applySubscriptionSuggestion(sub: Subscription) {
+    form.setValue('amount', sub.amount);
+    form.setValue('subscriptionId', sub.id);
+    if (!form.getValues('memo')) {
+      form.setValue('memo', sub.name);
+    }
+  }
 
   const memoSuggestionsQuery = useQuery({
     queryKey: ['memo-suggestions', memoSuggestionCategoryId ?? null],
@@ -857,6 +921,22 @@ function TransactionFormDialog({
             />
           )}
 
+          {matchingSubscriptions.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {matchingSubscriptions.map((sub) => (
+                <Button
+                  key={sub.id}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applySubscriptionSuggestion(sub)}
+                >
+                  {sub.name} {yenFormatter.format(sub.amount)}
+                </Button>
+              ))}
+            </div>
+          )}
+
           <FormField
             control={form.control}
             name="amount"
@@ -933,5 +1013,55 @@ function TransactionFormDialog({
         </form>
       </Form>
     </DialogContent>
+  );
+}
+
+/**
+ * 選択中の月にまだ記録されていない有効なサブスクリプションを知らせる案内カード
+ * （`PlanRestrictionNotice` を参考に、非永続の案内カードとして実装）。
+ */
+function SubscriptionMissingWarning({
+  subscriptions,
+  onDismiss,
+  className,
+}: {
+  subscriptions: { id: string; name: string }[];
+  onDismiss: () => void;
+  className?: string;
+}) {
+  return (
+    <Card
+      className={cn(
+        'border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30',
+        className,
+      )}
+    >
+      <CardContent className="flex items-start gap-3 py-4 text-sm">
+        <AlertTriangle
+          className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-500"
+          aria-hidden="true"
+        />
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          <span className="text-muted-foreground">
+            今月まだ記録されていないサブスクリプションがあります:
+          </span>
+          {subscriptions.map((sub) => (
+            <Badge key={sub.id} variant="outline">
+              {sub.name}
+            </Badge>
+          ))}
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="閉じる"
+          onClick={onDismiss}
+          className="-mt-1 -mr-1 size-7 shrink-0"
+        >
+          <X className="size-4" />
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

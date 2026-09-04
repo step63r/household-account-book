@@ -10,6 +10,10 @@
  *   POST   /categories
  *   PUT    /categories/:id
  *   DELETE /categories/:id
+ *   GET    /subscriptions                                   src/lib/subscriptions.ts
+ *   POST   /subscriptions
+ *   PUT    /subscriptions/:id
+ *   DELETE /subscriptions/:id
  *   GET    /transactions?from=YYYY-MM-DD&to=YYYY-MM-DD   src/lib/transactions.ts
  *   POST   /transactions
  *   PUT    /transactions/:id

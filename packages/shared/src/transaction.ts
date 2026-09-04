@@ -18,6 +18,12 @@ export const transactionSchema = z.object({
   /** transfer/income では未設定でもよい（費目マスタは支出専用のため） */
   categoryId: z.string().nullable(),
   /**
+   * この取引が紐づくサブスクリプション（任意）。expense以外はnullを要求する
+   * （assertSubscriptionIdRule、transactionService.ts）。既存レコードにはこの属性自体が
+   * 存在しない場合があるため、categoryIdと異なり`.optional()`も付けている。
+   */
+  subscriptionId: z.string().nullable().optional(),
+  /**
    * 円単位の整数。income/expense は正の整数のみ許可し、transfer は符号を問わず非ゼロの整数を
    * 許可する（正=積立などの入金、負=解約・引き出し）。type別の符号制約は categoryId の
    * type別必須/null制約と同じ理由でスキーマではなくサービス層（assertAmountSignRule）で課す。
@@ -41,6 +47,7 @@ export const createTransactionInputSchema = transactionSchema.pick({
   date: true,
   type: true,
   categoryId: true,
+  subscriptionId: true,
   amount: true,
   memo: true,
   transferLabel: true,

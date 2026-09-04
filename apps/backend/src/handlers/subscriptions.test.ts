@@ -1,0 +1,140 @@
+import { describe, expect, it } from 'vitest';
+import type { APIGatewayProxyEventV2WithJWTAuthorizer } from 'aws-lambda';
+import { handler as listSubscriptionsHandler } from './listSubscriptions';
+import { handler as createSubscriptionHandler } from './createSubscription';
+import { handler as updateSubscriptionHandler } from './updateSubscription';
+import { handler as deleteSubscriptionHandler } from './deleteSubscription';
+
+/**
+ * These exercise handler-level concerns (JWT sub extraction, body parsing, status-code
+ * mapping) without touching AWS. Requests never reach the DynamoDB repository because
+ * requireUserId()/schema validation short-circuit before any repository call.
+ */
+function buildEvent(
+  overrides: Partial<APIGatewayProxyEventV2WithJWTAuthorizer> = {},
+): APIGatewayProxyEventV2WithJWTAuthorizer {
+  return {
+    version: '2.0',
+    routeKey: '$default',
+    rawPath: '/subscriptions',
+    rawQueryString: '',
+    headers: {},
+    requestContext: {
+      accountId: '123456789012',
+      apiId: 'api-id',
+      domainName: 'api.example.com',
+      domainPrefix: 'api',
+      http: {
+        method: 'GET',
+        path: '/subscriptions',
+        protocol: 'HTTP/1.1',
+        sourceIp: '127.0.0.1',
+        userAgent: 'vitest',
+      },
+      requestId: 'request-id',
+      routeKey: '$default',
+      stage: '$default',
+      time: '24/Jul/2026:00:00:00 +0000',
+      timeEpoch: 0,
+      authorizer: {
+        jwt: {
+          claims: {},
+          scopes: [],
+        },
+      },
+    },
+    isBase64Encoded: false,
+    ...overrides,
+  } as APIGatewayProxyEventV2WithJWTAuthorizer;
+}
+
+function buildAuthenticatedEvent(
+  userId: string,
+  email: string,
+  overrides: Partial<APIGatewayProxyEventV2WithJWTAuthorizer> = {},
+): APIGatewayProxyEventV2WithJWTAuthorizer {
+  const base = buildEvent();
+  return buildEvent({
+    ...overrides,
+    requestContext: {
+      ...base.requestContext,
+      authorizer: {
+        principalId: userId,
+        integrationLatency: 0,
+        jwt: { claims: { sub: userId, email }, scopes: [] },
+      },
+    },
+  });
+}
+
+describe('listSubscriptions handler', () => {
+  it('returns 401 when the JWT sub claim is missing', async () => {
+    const event = buildEvent();
+
+    const result = await listSubscriptionsHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 401 });
+  });
+});
+
+describe('createSubscription handler', () => {
+  it('returns 400 for a missing request body', async () => {
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', { body: undefined });
+
+    const result = await createSubscriptionHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 400 });
+  });
+
+  it('returns 400 for a payload that fails createSubscriptionInputSchema validation', async () => {
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', {
+      body: JSON.stringify({ name: 'Netflix' }), // missing required fields
+    });
+
+    const result = await createSubscriptionHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 400 });
+  });
+});
+
+describe('updateSubscription handler', () => {
+  it('returns 400 when the id path parameter is missing', async () => {
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', {
+      pathParameters: {},
+      body: JSON.stringify({ name: 'New name' }),
+    });
+
+    const result = await updateSubscriptionHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 400 });
+  });
+
+  it('returns 401 when the JWT sub claim is missing', async () => {
+    const event = buildEvent({
+      pathParameters: { id: 'sub-1' },
+      body: JSON.stringify({ name: 'New name' }),
+    });
+
+    const result = await updateSubscriptionHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 401 });
+  });
+});
+
+describe('deleteSubscription handler', () => {
+  it('returns 400 when the id path parameter is missing', async () => {
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', { pathParameters: {} });
+
+    const result = await deleteSubscriptionHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 400 });
+  });
+
+  it('returns 401 when the JWT sub claim is missing', async () => {
+    const event = buildEvent({ pathParameters: { id: 'sub-1' } });
+
+    const result = await deleteSubscriptionHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 401 });
+  });
+});

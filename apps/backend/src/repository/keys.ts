@@ -14,6 +14,7 @@
  *   TXN#<date>#<txnId>                     transaction sort key (date is YYYY-MM-DD, sorts chronologically)
  *   CATEGORY#<categoryId>                  category sort key
  *   BUDGET#<yyyymm>#<categoryId>           monthly per-category budget sort key
+ *   SUBSCRIPTION#<subscriptionId>          subscription sort key
  */
 
 export function userPk(userId: string): string {
@@ -59,3 +60,9 @@ export function budgetSk(yearMonth: string, categoryId: string): string {
 }
 
 export const BUDGET_SK_PREFIX = 'BUDGET#';
+
+export function subscriptionSk(subscriptionId: string): string {
+  return `SUBSCRIPTION#${subscriptionId}`;
+}
+
+export const SUBSCRIPTION_SK_PREFIX = 'SUBSCRIPTION#';

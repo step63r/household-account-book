@@ -40,6 +40,22 @@ function assertAmountSignRule(type: TransactionType, amount: number): void {
   }
 }
 
+/**
+ * subscriptionId で紐付けられるのは expense のみ（categoryId と同じ理由 - サブスクリプション
+ * マスタは支出専用の費目マスタにぶら下がるため）。nullish（未紐付け）は常に許可する。
+ */
+function assertSubscriptionIdRule(
+  type: TransactionType,
+  subscriptionId: string | null | undefined,
+): void {
+  if (subscriptionId === null || subscriptionId === undefined) {
+    return;
+  }
+  if (type !== 'expense') {
+    throw new HttpError(400, `subscriptionId must be null when type is "${type}"`);
+  }
+}
+
 export async function listTransactions(
   repository: TransactionRepository,
   householdId: string,
@@ -69,6 +85,7 @@ export async function createTransaction(
   const input = createTransactionInputSchema.parse(rawInput);
   assertCategoryIdRule(input.type, input.categoryId);
   assertAmountSignRule(input.type, input.amount);
+  assertSubscriptionIdRule(input.type, input.subscriptionId);
   assertWithinPlanWindow(plan, input.date);
 
   const now = new Date().toISOString();
@@ -109,6 +126,7 @@ export async function updateTransaction(
   };
   assertCategoryIdRule(updated.type, updated.categoryId);
   assertAmountSignRule(updated.type, updated.amount);
+  assertSubscriptionIdRule(updated.type, updated.subscriptionId);
   // ...and reject moving one into that window via a `date` change.
   assertWithinPlanWindow(plan, updated.date);
 

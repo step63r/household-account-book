@@ -144,6 +144,55 @@ describe('createTransaction', () => {
 
     expect(transaction.amount).toBe(-5000);
   });
+
+  it('rejects a transfer with a non-null subscriptionId', async () => {
+    const repository = new FakeTransactionRepository();
+
+    await expect(
+      createTransaction(repository, 'user-1', 'creator-1', {
+        date: '2026-07-10',
+        type: 'transfer',
+        categoryId: null,
+        amount: 5000,
+        transferLabel: 'NISA',
+        subscriptionId: 'subscription-1',
+      }),
+    ).rejects.toThrow(HttpError);
+  });
+
+  it('rejects an income with a non-null subscriptionId', async () => {
+    const repository = new FakeTransactionRepository();
+
+    await expect(
+      createTransaction(repository, 'user-1', 'creator-1', {
+        date: '2026-07-10',
+        type: 'income',
+        categoryId: null,
+        amount: 300000,
+        incomeSource: '給与',
+        subscriptionId: 'subscription-1',
+      }),
+    ).rejects.toThrow(HttpError);
+  });
+
+  it('accepts an expense with a non-null subscriptionId', async () => {
+    const repository = new FakeTransactionRepository();
+
+    const transaction = await createTransaction(repository, 'user-1', 'creator-1', {
+      ...validExpense,
+      subscriptionId: 'subscription-1',
+    });
+
+    expect(transaction.subscriptionId).toBe('subscription-1');
+  });
+
+  it('accepts an expense with no subscriptionId (undefined)', async () => {
+    const repository = new FakeTransactionRepository();
+
+    const transaction = await createTransaction(repository, 'user-1', 'creator-1', validExpense);
+
+    expect(transaction.subscriptionId).toBeUndefined();
+  });
 });
 
 describe('listTransactions', () => {
@@ -217,6 +266,23 @@ describe('updateTransaction', () => {
 
     await expect(
       updateTransaction(repository, 'user-1', transaction.id, { amount: -3000 }),
+    ).rejects.toThrow(HttpError);
+  });
+
+  it('rejects a merged result that violates the subscriptionId rule', async () => {
+    const repository = new FakeTransactionRepository();
+    const transaction = await createTransaction(repository, 'user-1', 'creator-1', {
+      ...validExpense,
+      subscriptionId: 'subscription-1',
+    });
+
+    // Flipping to transfer without clearing subscriptionId must be rejected, even though only
+    // `type`/`categoryId` were provided in this partial update.
+    await expect(
+      updateTransaction(repository, 'user-1', transaction.id, {
+        type: 'transfer',
+        categoryId: null,
+      }),
     ).rejects.toThrow(HttpError);
   });
 

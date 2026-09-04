@@ -7,6 +7,7 @@ import DashboardPage from '@/pages/DashboardPage';
 import TransactionsPage from '@/pages/TransactionsPage';
 import BudgetsPage from '@/pages/BudgetsPage';
 import CategoriesPage from '@/pages/CategoriesPage';
+import SubscriptionsPage from '@/pages/SubscriptionsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import LoginPage from '@/pages/LoginPage';
 import SignupPage from '@/pages/SignupPage';
@@ -33,6 +34,7 @@ function App() {
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/budgets" element={<BudgetsPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
+            <Route path="/subscriptions" element={<SubscriptionsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Route>

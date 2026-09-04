@@ -7,3 +7,4 @@ export * from './aggregation';
 export * from './consent';
 export * from './plan';
 export * from './household';
+export * from './subscription';
