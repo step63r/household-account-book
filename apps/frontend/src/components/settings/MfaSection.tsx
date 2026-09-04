@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { QRCodeSVG } from 'qrcode.react';
+import { Info } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Dialog,
   DialogClose,
@@ -231,8 +233,20 @@ export function MfaSection({
     <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
       <div>
         <p className="text-sm font-medium">二要素認証（MFA）</p>
-        <p className="text-sm text-muted-foreground">
-          {enabled ? '有効' : '無効'} - 認証アプリの6桁コードでログインを保護します
+        <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          {enabled ? '有効' : '無効'}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="二要素認証（MFA）の説明"
+              >
+                <Info className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>認証アプリの6桁コードでログインを保護します</TooltipContent>
+          </Tooltip>
         </p>
       </div>
       {enabled ? (

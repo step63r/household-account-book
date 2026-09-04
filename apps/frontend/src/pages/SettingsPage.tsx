@@ -1,17 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, LogOut, Users } from 'lucide-react';
+import { AlertTriangle, Info, LogOut, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Dialog,
   DialogClose,
@@ -111,8 +105,21 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>アカウント情報</CardTitle>
-          <CardDescription>ログイン中のアカウントの情報です</CardDescription>
+          <div className="flex items-center gap-1.5">
+            <CardTitle>アカウント情報</CardTitle>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="アカウント情報の説明"
+                >
+                  <Info className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>ログイン中のアカウントの情報です</TooltipContent>
+            </Tooltip>
+          </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-2 text-sm">
           <div className="flex items-center justify-between py-2">
@@ -130,23 +137,56 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>セキュリティ</CardTitle>
-          <CardDescription>メールアドレスやパスワードを変更します</CardDescription>
+          <div className="flex items-center gap-1.5">
+            <CardTitle>セキュリティ</CardTitle>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="セキュリティの説明"
+                >
+                  <Info className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>メールアドレスやパスワードを変更します</TooltipContent>
+            </Tooltip>
+          </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
-            <div>
+            <div className="flex items-center gap-1.5">
               <p className="text-sm font-medium">メールアドレス</p>
-              <p className="text-sm text-muted-foreground">
-                ログインに使用するメールアドレスを変更します
-              </p>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground"
+                    aria-label="メールアドレスの説明"
+                  >
+                    <Info className="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>ログインに使用するメールアドレスを変更します</TooltipContent>
+              </Tooltip>
             </div>
             <ChangeEmailDialog onEmailChanged={setEmail} onSuccess={handleSuccess} />
           </div>
           <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
-            <div>
+            <div className="flex items-center gap-1.5">
               <p className="text-sm font-medium">パスワード</p>
-              <p className="text-sm text-muted-foreground">ログインパスワードを変更します</p>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground"
+                    aria-label="パスワードの説明"
+                  >
+                    <Info className="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>ログインパスワードを変更します</TooltipContent>
+              </Tooltip>
             </div>
             <ChangePasswordDialog onSuccess={handleSuccess} />
           </div>
@@ -156,8 +196,21 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>世帯</CardTitle>
-          <CardDescription>家族と家計データ（取引・費目・予算）を共有します</CardDescription>
+          <div className="flex items-center gap-1.5">
+            <CardTitle>世帯</CardTitle>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="世帯の説明"
+                >
+                  <Info className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>家族と家計データ（取引・費目・予算）を共有します</TooltipContent>
+            </Tooltip>
+          </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 text-sm">
           {householdQuery.isLoading && <p className="text-muted-foreground">読み込み中...</p>}
