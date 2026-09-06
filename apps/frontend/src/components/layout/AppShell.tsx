@@ -1,14 +1,25 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { Menu, Wallet } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { Footer } from './Footer';
 import { MOBILE_TAB_ITEMS, NAV_ITEMS } from './nav-items';
+import { PullToRefreshIndicator } from './PullToRefreshIndicator';
 
 export function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const mainRef = useRef<HTMLElement>(null);
+
+  const handleRefresh = useCallback(
+    () => queryClient.refetchQueries({ type: 'active' }),
+    [queryClient],
+  );
+  const ptr = usePullToRefresh(handleRefresh, mainRef);
 
   return (
     <div className="flex min-h-svh flex-col bg-background pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:flex-row">
@@ -45,8 +56,15 @@ export function AppShell() {
         <span className="text-base font-semibold">家計簿</span>
       </header>
 
-      <main className="flex-1 overflow-x-hidden px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-8 md:py-8 md:pb-8">
-        <div className="mx-auto w-full max-w-5xl">
+      <main
+        ref={mainRef}
+        className="relative flex-1 overflow-x-hidden px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-8 md:py-8 md:pb-8"
+      >
+        <PullToRefreshIndicator {...ptr} />
+        <div
+          className="mx-auto w-full max-w-5xl transition-transform"
+          style={{ transform: ptr.pullDistance ? `translateY(${ptr.pullDistance}px)` : undefined }}
+        >
           <Outlet />
           <Footer />
         </div>
