@@ -71,7 +71,9 @@ export function BudgetVarianceList({
                 className="h-full rounded-full transition-all"
                 style={{
                   width: `${widthPercent}%`,
-                  backgroundColor: isOverBudget ? 'var(--status-critical)' : 'var(--status-good)',
+                  background: isOverBudget
+                    ? 'linear-gradient(to right, var(--status-critical), color-mix(in srgb, var(--status-critical) 68%, transparent))'
+                    : 'linear-gradient(to right, var(--status-good), color-mix(in srgb, var(--status-good) 68%, transparent))',
                 }}
               />
             </div>

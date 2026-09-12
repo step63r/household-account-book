@@ -87,6 +87,12 @@ export function TrendChart({
     <div className="h-64 w-full" role="img" aria-label="支出推移グラフ">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} barGap={4} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="expenseBarFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--series-expense)" stopOpacity={0.68} />
+              <stop offset="100%" stopColor="var(--series-expense)" stopOpacity={1} />
+            </linearGradient>
+          </defs>
           <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
           <XAxis
             dataKey="period"
@@ -116,7 +122,7 @@ export function TrendChart({
           <Bar
             dataKey="expense"
             name="支出"
-            fill="var(--series-expense)"
+            fill="url(#expenseBarFill)"
             radius={[4, 4, 0, 0]}
             maxBarSize={28}
           />

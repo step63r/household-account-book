@@ -105,7 +105,11 @@ export function CategoryBreakdownChart({
             >
               <div
                 className="h-full rounded-full transition-all"
-                style={{ width: `${percent}%`, backgroundColor: 'var(--series-expense)' }}
+                style={{
+                  width: `${percent}%`,
+                  background:
+                    'linear-gradient(to right, var(--series-expense), color-mix(in srgb, var(--series-expense) 68%, transparent))',
+                }}
               />
             </div>
           </li>

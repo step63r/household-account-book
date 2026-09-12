@@ -74,6 +74,16 @@ export function IncomeExpenseTrendChart({
           barGap={4}
           margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
         >
+          <defs>
+            <linearGradient id="incomeBarFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--series-income)" stopOpacity={0.68} />
+              <stop offset="100%" stopColor="var(--series-income)" stopOpacity={1} />
+            </linearGradient>
+            <linearGradient id="expenseBarFillDown" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--series-expense)" stopOpacity={1} />
+              <stop offset="100%" stopColor="var(--series-expense)" stopOpacity={0.68} />
+            </linearGradient>
+          </defs>
           <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
           <XAxis
             dataKey="period"
@@ -104,7 +114,7 @@ export function IncomeExpenseTrendChart({
           <Bar
             dataKey="income"
             name="収入"
-            fill="var(--series-income)"
+            fill="url(#incomeBarFill)"
             stackId="net"
             radius={[4, 4, 0, 0]}
             maxBarSize={28}
@@ -112,7 +122,7 @@ export function IncomeExpenseTrendChart({
           <Bar
             dataKey="expenseNegated"
             name="支出"
-            fill="var(--series-expense)"
+            fill="url(#expenseBarFillDown)"
             stackId="net"
             // 負の値のバーはRechartsがradius配列の丸め位置を反転して描画するため、
             // 収入と同じ[4,4,0,0]を指定することでゼロ基準線側が角、先端側が丸くなる
