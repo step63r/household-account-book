@@ -15,6 +15,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export const BAR_SKELETON_HEIGHTS = [55, 80, 40, 95, 60, 75, 45];
 
+/** Barの`fill`はグラデーション(`url(#...)`)を指定しているため、Rechartsが
+ * ツールチップ用に生成する`entry.color`もその文字列になりCSSの`background-color`
+ * には使えない（アイコンが透明になる）。dataKeyから実際の系列色を引き直す。 */
+const SERIES_COLOR_BY_DATA_KEY: Record<string, string> = {
+  expense: 'var(--series-expense)',
+  income: 'var(--series-income)',
+  expenseNegated: 'var(--series-expense)',
+};
+
 export function CustomTooltip({
   active,
   payload,
@@ -22,7 +31,7 @@ export function CustomTooltip({
   granularity,
 }: {
   active?: boolean;
-  payload?: { name: string; value: number; color: string }[];
+  payload?: { name: string; value: number; color: string; dataKey?: string }[];
   label?: string;
   granularity: TrendGranularity;
 }) {
@@ -36,7 +45,10 @@ export function CustomTooltip({
         <p key={entry.name} className="flex items-center gap-2">
           <span
             className="inline-block size-2 rounded-full"
-            style={{ backgroundColor: entry.color }}
+            style={{
+              backgroundColor:
+                (entry.dataKey && SERIES_COLOR_BY_DATA_KEY[entry.dataKey]) || entry.color,
+            }}
             aria-hidden="true"
           />
           <span className="text-muted-foreground">{entry.name}</span>
