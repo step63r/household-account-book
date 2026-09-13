@@ -133,7 +133,7 @@ export function CategoryBreakdownChart({
 
   return (
     <div
-      className="flex flex-col items-center gap-6 sm:flex-row sm:items-center"
+      className="flex flex-col items-center gap-6"
       role="img"
       aria-label="費目別支出の内訳グラフ"
     >
