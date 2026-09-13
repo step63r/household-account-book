@@ -36,6 +36,12 @@
   --series-actual: #eb6834;
   --status-good: #0ca30c;
   --status-critical: #d03b3b;
+  --category-1: #2a78d6;
+  --category-2: #eb6834;
+  --category-3: #1baf7a;
+  --category-4: #eda100;
+  --category-5: #e87ba4;
+  --category-6: #008300;
 }
 
 .dark {
@@ -70,6 +76,12 @@
   --series-actual: #d95926;
   --status-good: #0ca30c;
   --status-critical: #d03b3b;
+  --category-1: #3987e5;
+  --category-2: #d95926;
+  --category-3: #199e70;
+  --category-4: #c98500;
+  --category-5: #d55181;
+  --category-6: #008300;
 }
 
 @theme inline {
