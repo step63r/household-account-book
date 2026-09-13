@@ -103,7 +103,7 @@ export function CategoryBreakdownChart({
   if (isLoading) {
     return (
       <div
-        className="flex flex-col items-center gap-6 sm:flex-row sm:items-center"
+        className="flex flex-col items-center gap-6"
         aria-label="費目別支出の内訳を読み込み中"
         aria-busy="true"
       >
@@ -146,6 +146,8 @@ export function CategoryBreakdownChart({
               nameKey="categoryName"
               innerRadius="62%"
               outerRadius="100%"
+              startAngle={90}
+              endAngle={-270}
               stroke="var(--chart-surface)"
               strokeWidth={2}
             >
@@ -153,10 +155,10 @@ export function CategoryBreakdownChart({
                 <Cell key={row.categoryId} fill={colorForRow(row, index)} />
               ))}
             </Pie>
-            <Tooltip content={<CustomTooltip total={total} />} />
+            <Tooltip content={<CustomTooltip total={total} />} wrapperStyle={{ zIndex: 10 }} />
           </PieChart>
         </ResponsiveContainer>
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+        <div className="pointer-events-none absolute inset-0 z-0 flex flex-col items-center justify-center">
           <span className="text-xs text-muted-foreground">合計</span>
           <span className="text-sm font-medium tabular-nums">{formatYen(total)}</span>
         </div>
