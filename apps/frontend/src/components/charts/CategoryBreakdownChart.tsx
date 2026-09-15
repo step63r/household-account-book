@@ -22,7 +22,12 @@ type BreakdownRow = {
   categoryId: string;
   categoryName: string;
   amount: number;
+  color: string;
 };
+
+function colorForIndex(categoryId: string, index: number): string {
+  return categoryId === OTHER_CATEGORY_ID ? OTHER_COLOR : (CATEGORY_COLORS[index] ?? OTHER_COLOR);
+}
 
 function buildBreakdown(
   rows: readonly CategoryPivotRow[],
@@ -39,46 +44,48 @@ function buildBreakdown(
 
   const total = withAmount.reduce((sum, row) => sum + row.amount, 0);
 
-  if (withAmount.length <= TOP_N) {
-    return { rows: withAmount, total };
-  }
+  const withoutColor =
+    withAmount.length <= TOP_N
+      ? withAmount
+      : [
+          ...withAmount.slice(0, TOP_N),
+          {
+            categoryId: OTHER_CATEGORY_ID,
+            categoryName: OTHER_LABEL,
+            amount: withAmount.slice(TOP_N).reduce((sum, row) => sum + row.amount, 0),
+          },
+        ];
 
-  const top = withAmount.slice(0, TOP_N);
-  const otherAmount = withAmount.slice(TOP_N).reduce((sum, row) => sum + row.amount, 0);
   return {
-    rows: [
-      ...top,
-      { categoryId: OTHER_CATEGORY_ID, categoryName: OTHER_LABEL, amount: otherAmount },
-    ],
+    rows: withoutColor.map((row, index) => ({
+      ...row,
+      color: colorForIndex(row.categoryId, index),
+    })),
     total,
   };
 }
 
-function colorForRow(row: BreakdownRow, index: number): string {
-  return row.categoryId === OTHER_CATEGORY_ID
-    ? OTHER_COLOR
-    : (CATEGORY_COLORS[index] ?? OTHER_COLOR);
-}
-
+/** Rechartsの<Tooltip>はPieの各セクターの色（Cellのfill）をpayloadに含めないため、
+ * 凡例の色と一致させるには自前でrowに保持させたcolorを使う必要がある。 */
 function CustomTooltip({
   active,
   payload,
   total,
 }: {
   active?: boolean;
-  payload?: { payload: BreakdownRow; color: string }[];
+  payload?: { payload: BreakdownRow }[];
   total: number;
 }) {
   const entry = active ? payload?.[0] : undefined;
   if (!entry) return null;
-  const { payload: row, color } = entry;
+  const row = entry.payload;
   const percent = (row.amount / total) * 100;
   return (
     <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
       <p className="flex items-center gap-2">
         <span
           className="inline-block size-2 rounded-full"
-          style={{ backgroundColor: color }}
+          style={{ backgroundColor: row.color }}
           aria-hidden="true"
         />
         <span className="font-medium">{row.categoryName}</span>
@@ -151,8 +158,8 @@ export function CategoryBreakdownChart({
               stroke="var(--chart-surface)"
               strokeWidth={2}
             >
-              {breakdownRows.map((row, index) => (
-                <Cell key={row.categoryId} fill={colorForRow(row, index)} />
+              {breakdownRows.map((row) => (
+                <Cell key={row.categoryId} fill={row.color} />
               ))}
             </Pie>
             <Tooltip content={<CustomTooltip total={total} />} wrapperStyle={{ zIndex: 10 }} />
@@ -164,13 +171,13 @@ export function CategoryBreakdownChart({
         </div>
       </div>
       <ul className="flex w-full min-w-0 flex-col gap-2.5">
-        {breakdownRows.map((row, index) => {
+        {breakdownRows.map((row) => {
           const percent = (row.amount / total) * 100;
           return (
             <li key={row.categoryId} className="flex items-center gap-2 text-sm">
               <span
                 className="size-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: colorForRow(row, index) }}
+                style={{ backgroundColor: row.color }}
                 aria-hidden="true"
               />
               <span className="truncate font-medium">{row.categoryName}</span>
