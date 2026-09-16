@@ -87,9 +87,9 @@ export async function updateCategory(
 }
 
 /**
- * 費目の並び替え（type単位）。orderedIdsとDB上の同typeの費目集合が完全に一致することを
- * 検証してから、orderedIdsの並び順で0始まりのsortOrderを振り直す。一部だけ適用することはない
- * （検証を先に済ませてから書き込む）。
+ * 費目の並び替え（固定費・変動費を区別せず世帯の費目全体で1つの順序）。orderedIdsとDB上の
+ * 費目集合が完全に一致することを検証してから、orderedIdsの並び順で0始まりのsortOrderを
+ * 振り直す。一部だけ適用することはない（検証を先に済ませてから書き込む）。
  */
 export async function reorderCategories(
   repository: CategoryRepository,
@@ -99,23 +99,22 @@ export async function reorderCategories(
   const input = reorderCategoriesInputSchema.parse(rawInput);
 
   const existing = await repository.listByHousehold(householdId);
-  const sameType = existing.filter((c) => c.type === input.type);
 
   const orderedIdSet = new Set(input.orderedIds);
   if (orderedIdSet.size !== input.orderedIds.length) {
     throw new HttpError(400, 'orderedIds contains duplicate ids');
   }
-  const sameTypeIdSet = new Set(sameType.map((c) => c.id));
-  if (orderedIdSet.size !== sameTypeIdSet.size) {
+  const existingIdSet = new Set(existing.map((c) => c.id));
+  if (orderedIdSet.size !== existingIdSet.size) {
     throw new HttpError(400, 'orderedIds does not match the existing category set');
   }
   for (const id of input.orderedIds) {
-    if (!sameTypeIdSet.has(id)) {
+    if (!existingIdSet.has(id)) {
       throw new HttpError(400, `orderedIds contains unknown category id: ${id}`);
     }
   }
 
-  const byId = new Map(sameType.map((c) => [c.id, c]));
+  const byId = new Map(existing.map((c) => [c.id, c]));
   const now = new Date().toISOString();
   const updated: Category[] = input.orderedIds.map((id, index) => ({
     ...byId.get(id)!,

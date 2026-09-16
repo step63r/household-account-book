@@ -28,10 +28,9 @@ export type CreateCategoryInput = z.infer<typeof createCategoryInputSchema>;
 export const updateCategoryInputSchema = createCategoryInputSchema.partial();
 export type UpdateCategoryInput = z.infer<typeof updateCategoryInputSchema>;
 
-/** 費目の並び替え（type単位）。sortOrderはクライアントから直接指定させず、
- * orderedIdsの並び順からサービス層で0始まりの連番として採番する。 */
+/** 費目の並び替え（固定費・変動費を区別せず世帯の費目全体で1つの順序）。sortOrderはクライアント
+ * から直接指定させず、orderedIdsの並び順からサービス層で0始まりの連番として採番する。 */
 export const reorderCategoriesInputSchema = z.object({
-  type: categoryTypeSchema,
   orderedIds: z.array(z.string()).min(1),
 });
 export type ReorderCategoriesInput = z.infer<typeof reorderCategoriesInputSchema>;

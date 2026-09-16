@@ -99,7 +99,7 @@ describe('createCategory handler', () => {
 describe('reorderCategories handler', () => {
   it('returns 401 when the JWT sub claim is missing', async () => {
     const event = buildEvent({
-      body: JSON.stringify({ type: 'fixed', orderedIds: ['a', 'b'] }),
+      body: JSON.stringify({ orderedIds: ['a', 'b'] }),
     });
 
     const result = await reorderCategoriesHandler(event, {} as never, () => undefined);
@@ -117,7 +117,7 @@ describe('reorderCategories handler', () => {
 
   it('returns 400 for a payload missing orderedIds', async () => {
     const event = buildAuthenticatedEvent('user-1', 'user1@example.com', {
-      body: JSON.stringify({ type: 'fixed' }),
+      body: JSON.stringify({}),
     });
 
     const result = await reorderCategoriesHandler(event, {} as never, () => undefined);
@@ -127,7 +127,7 @@ describe('reorderCategories handler', () => {
 
   it('returns 400 for a payload with an empty orderedIds array', async () => {
     const event = buildAuthenticatedEvent('user-1', 'user1@example.com', {
-      body: JSON.stringify({ type: 'fixed', orderedIds: [] }),
+      body: JSON.stringify({ orderedIds: [] }),
     });
 
     const result = await reorderCategoriesHandler(event, {} as never, () => undefined);

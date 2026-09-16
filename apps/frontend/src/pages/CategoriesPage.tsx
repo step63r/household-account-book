@@ -14,10 +14,10 @@ import { GripVertical, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   createCategoryInputSchema,
   type Category,
-  type CategoryType,
   type CreateCategoryInput,
 } from '@household/shared';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -62,15 +62,10 @@ export default function CategoriesPage() {
   });
   const categories = categoriesQuery.data ?? EMPTY_ARRAY;
 
-  const grouped = useMemo(() => {
-    const fixed = categories
-      .filter((c) => c.type === 'fixed')
-      .sort((a, b) => a.sortOrder - b.sortOrder);
-    const variable = categories
-      .filter((c) => c.type === 'variable')
-      .sort((a, b) => a.sortOrder - b.sortOrder);
-    return { fixed, variable };
-  }, [categories]);
+  const sortedCategories = useMemo(
+    () => categories.slice().sort((a, b) => a.sortOrder - b.sortOrder),
+    [categories],
+  );
 
   const [dialogState, setDialogState] = useState<{ open: boolean; category: Category | null }>({
     open: false,
@@ -94,17 +89,14 @@ export default function CategoriesPage() {
   });
 
   const reorderMutation = useMutation({
-    mutationFn: ({ type, orderedIds }: { type: CategoryType; orderedIds: string[] }) =>
-      reorderCategories(type, orderedIds),
-    onMutate: async ({ type, orderedIds }) => {
+    mutationFn: (orderedIds: string[]) => reorderCategories(orderedIds),
+    onMutate: async (orderedIds) => {
       await queryClient.cancelQueries({ queryKey: ['categories'] });
       const previous = queryClient.getQueryData<Category[]>(['categories']);
       queryClient.setQueryData<Category[]>(['categories'], (old) => {
         if (!old) return old;
         const orderMap = new Map(orderedIds.map((id, index) => [id, index]));
-        return old.map((c) =>
-          c.type === type ? { ...c, sortOrder: orderMap.get(c.id) ?? c.sortOrder } : c,
-        );
+        return old.map((c) => ({ ...c, sortOrder: orderMap.get(c.id) ?? c.sortOrder }));
       });
       return { previous };
     },
@@ -152,32 +144,22 @@ export default function CategoriesPage() {
         />
       </Dialog>
 
-      <CategoryGroupCard
-        title="固定費"
-        categories={grouped.fixed}
+      <CategoryListCard
+        categories={sortedCategories}
         onEdit={openEditDialog}
         onDelete={(id) => deleteMutation.mutate(id)}
-        onReorder={(orderedIds) => reorderMutation.mutate({ type: 'fixed', orderedIds })}
-      />
-      <CategoryGroupCard
-        title="変動費"
-        categories={grouped.variable}
-        onEdit={openEditDialog}
-        onDelete={(id) => deleteMutation.mutate(id)}
-        onReorder={(orderedIds) => reorderMutation.mutate({ type: 'variable', orderedIds })}
+        onReorder={(orderedIds) => reorderMutation.mutate(orderedIds)}
       />
     </div>
   );
 }
 
-function CategoryGroupCard({
-  title,
+function CategoryListCard({
   categories,
   onEdit,
   onDelete,
   onReorder,
 }: {
-  title: string;
   categories: Category[];
   onEdit: (category: Category) => void;
   onDelete: (id: string) => void;
@@ -188,7 +170,7 @@ function CategoryGroupCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
+        <CardTitle>費目</CardTitle>
         <CardDescription>{categories.length} 件</CardDescription>
       </CardHeader>
       <CardContent>
@@ -259,6 +241,9 @@ function SortableCategoryRow({
           <GripVertical className="size-4" />
         </button>
         <span className="text-sm font-medium">{category.name}</span>
+        <Badge variant={category.type === 'fixed' ? 'default' : 'secondary'}>
+          {category.type === 'fixed' ? '固定費' : '変動費'}
+        </Badge>
         {category.tooltip && (
           <InfoTooltip label={`${category.name}の説明`}>{category.tooltip}</InfoTooltip>
         )}

@@ -5,12 +5,7 @@
  * `BudgetsPage.tsx` も同じ TanStack Query キー `['categories']` でこのモジュールを使う
  * （取引・予算は費目 ID を参照するため、費目データソースは 1 箇所に揃える必要がある）。
  */
-import type {
-  Category,
-  CategoryType,
-  CreateCategoryInput,
-  UpdateCategoryInput,
-} from '@household/shared';
+import type { Category, CreateCategoryInput, UpdateCategoryInput } from '@household/shared';
 
 import { apiFetch } from '@/lib/api';
 
@@ -30,6 +25,6 @@ export function deleteCategory(id: string): Promise<void> {
   return apiFetch<void>(`/categories/${id}`, { method: 'DELETE' });
 }
 
-export function reorderCategories(type: CategoryType, orderedIds: string[]): Promise<Category[]> {
-  return apiFetch<Category[]>('/categories/reorder', { method: 'PUT', body: { type, orderedIds } });
+export function reorderCategories(orderedIds: string[]): Promise<Category[]> {
+  return apiFetch<Category[]>('/categories/reorder', { method: 'PUT', body: { orderedIds } });
 }

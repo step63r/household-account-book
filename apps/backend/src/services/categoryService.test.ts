@@ -50,6 +50,24 @@ describe('listCategories', () => {
     expect(userTwoCategories).toHaveLength(PRESET_CATEGORIES.length);
     expect(userTwoCategories.every((category) => category.householdId === 'user-2')).toBe(true);
   });
+
+  it('freely interleaves fixed and variable categories once reordered together', async () => {
+    const repository = new FakeCategoryRepository();
+    const fixedA = await createCategory(repository, 'user-1', { name: '固定A', type: 'fixed' });
+    const variableA = await createCategory(repository, 'user-1', {
+      name: '変動A',
+      type: 'variable',
+    });
+    const fixedB = await createCategory(repository, 'user-1', { name: '固定B', type: 'fixed' });
+
+    await reorderCategories(repository, 'user-1', {
+      orderedIds: [variableA.id, fixedB.id, fixedA.id],
+    });
+
+    const listed = await listCategories(repository, 'user-1');
+
+    expect(listed.map((c) => c.id)).toEqual([variableA.id, fixedB.id, fixedA.id]);
+  });
 });
 
 describe('createCategory', () => {
@@ -122,71 +140,45 @@ describe('updateCategory', () => {
 });
 
 describe('reorderCategories', () => {
-  it('reorders one type only, leaving the other type untouched', async () => {
+  it('reorders the whole household category set, freely mixing fixed and variable', async () => {
     const repository = new FakeCategoryRepository();
     const fixedA = await createCategory(repository, 'user-1', { name: '固定A', type: 'fixed' });
-    const fixedB = await createCategory(repository, 'user-1', { name: '固定B', type: 'fixed' });
     const variableA = await createCategory(repository, 'user-1', {
       name: '変動A',
       type: 'variable',
     });
-    const variableB = await createCategory(repository, 'user-1', {
-      name: '変動B',
-      type: 'variable',
-    });
+    const fixedB = await createCategory(repository, 'user-1', { name: '固定B', type: 'fixed' });
 
     const result = await reorderCategories(repository, 'user-1', {
-      type: 'fixed',
-      orderedIds: [fixedB.id, fixedA.id],
+      orderedIds: [variableA.id, fixedB.id, fixedA.id],
     });
 
-    expect(result.map((c) => c.id)).toEqual([fixedB.id, fixedA.id]);
-    expect(result.map((c) => c.sortOrder)).toEqual([0, 1]);
-
-    const persistedVariableA = await repository.getById('user-1', variableA.id);
-    const persistedVariableB = await repository.getById('user-1', variableB.id);
-    expect(persistedVariableA?.sortOrder).toBe(variableA.sortOrder);
-    expect(persistedVariableB?.sortOrder).toBe(variableB.sortOrder);
-  });
-
-  it('returns the categories reflecting new sortOrder values matching orderedIds order', async () => {
-    const repository = new FakeCategoryRepository();
-    const a = await createCategory(repository, 'user-1', { name: 'A', type: 'variable' });
-    const b = await createCategory(repository, 'user-1', { name: 'B', type: 'variable' });
-    const c = await createCategory(repository, 'user-1', { name: 'C', type: 'variable' });
-
-    const result = await reorderCategories(repository, 'user-1', {
-      type: 'variable',
-      orderedIds: [c.id, a.id, b.id],
-    });
-
-    expect(result.map((category) => category.id)).toEqual([c.id, a.id, b.id]);
-    expect(result.map((category) => category.sortOrder)).toEqual([0, 1, 2]);
+    expect(result.map((c) => c.id)).toEqual([variableA.id, fixedB.id, fixedA.id]);
+    expect(result.map((c) => c.sortOrder)).toEqual([0, 1, 2]);
 
     const persisted = await repository.listByHousehold('user-1');
-    expect(persisted.find((category) => category.id === c.id)?.sortOrder).toBe(0);
-    expect(persisted.find((category) => category.id === a.id)?.sortOrder).toBe(1);
-    expect(persisted.find((category) => category.id === b.id)?.sortOrder).toBe(2);
+    expect(persisted.find((c) => c.id === variableA.id)?.sortOrder).toBe(0);
+    expect(persisted.find((c) => c.id === fixedB.id)?.sortOrder).toBe(1);
+    expect(persisted.find((c) => c.id === fixedA.id)?.sortOrder).toBe(2);
   });
 
   it('rejects when orderedIds is missing an existing id', async () => {
     const repository = new FakeCategoryRepository();
     const a = await createCategory(repository, 'user-1', { name: 'A', type: 'variable' });
-    await createCategory(repository, 'user-1', { name: 'B', type: 'variable' });
+    await createCategory(repository, 'user-1', { name: 'B', type: 'fixed' });
 
-    await expect(
-      reorderCategories(repository, 'user-1', { type: 'variable', orderedIds: [a.id] }),
-    ).rejects.toThrow(HttpError);
+    await expect(reorderCategories(repository, 'user-1', { orderedIds: [a.id] })).rejects.toThrow(
+      HttpError,
+    );
   });
 
   it('rejects when orderedIds contains a foreign/extra id', async () => {
     const repository = new FakeCategoryRepository();
     const a = await createCategory(repository, 'user-1', { name: 'A', type: 'variable' });
-    const b = await createCategory(repository, 'user-1', { name: 'B', type: 'variable' });
+    const b = await createCategory(repository, 'user-1', { name: 'B', type: 'fixed' });
 
     await expect(
       reorderCategories(repository, 'user-1', {
-        type: 'variable',
         orderedIds: [a.id, b.id, 'unknown-id'],
       }),
     ).rejects.toThrow(HttpError);
@@ -195,11 +187,10 @@ describe('reorderCategories', () => {
   it('rejects when orderedIds contains a duplicate id', async () => {
     const repository = new FakeCategoryRepository();
     const a = await createCategory(repository, 'user-1', { name: 'A', type: 'variable' });
-    const b = await createCategory(repository, 'user-1', { name: 'B', type: 'variable' });
+    const b = await createCategory(repository, 'user-1', { name: 'B', type: 'fixed' });
 
     await expect(
       reorderCategories(repository, 'user-1', {
-        type: 'variable',
         orderedIds: [a.id, a.id, b.id],
       }),
     ).rejects.toThrow(HttpError);

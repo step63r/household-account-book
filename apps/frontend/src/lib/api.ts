@@ -10,7 +10,7 @@
  *   POST   /categories
  *   PUT    /categories/:id
  *   DELETE /categories/:id
- *   PUT    /categories/reorder      (body: { type, orderedIds })
+ *   PUT    /categories/reorder      (body: { orderedIds }, 固定費・変動費を区別しない世帯全体の順序)
  *   GET    /subscriptions                                   src/lib/subscriptions.ts
  *   POST   /subscriptions
  *   PUT    /subscriptions/:id

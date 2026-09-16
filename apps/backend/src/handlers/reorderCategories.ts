@@ -15,7 +15,7 @@ const repository = new DynamoCategoryRepository();
 const userRepository = new DynamoUserRepository();
 const householdRepository = new DynamoHouseholdRepository();
 
-/** PUT /categories/reorder - reorder categories within a single type. Validated with reorderCategoriesInputSchema. */
+/** PUT /categories/reorder - reorder all of the household's categories (fixed and variable mixed). Validated with reorderCategoriesInputSchema. */
 export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
   try {
     const userId = requireUserId(event);
@@ -30,7 +30,7 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
       email,
     );
     const categories = await reorderCategories(repository, householdId, input);
-    logAudit({ userId, action: 'category.reorder', targetId: `type:${input.type}` });
+    logAudit({ userId, action: 'category.reorder', targetId: 'household' });
     return jsonResponse(200, categories);
   } catch (error) {
     return handleError(error);
