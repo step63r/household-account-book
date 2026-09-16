@@ -51,6 +51,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { MultiSelectFilter } from '@/components/ui/multi-select-filter';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { MonthNavigator } from '@/components/MonthNavigator';
 import { PlanRestrictionNotice } from '@/components/plan/PlanRestrictionNotice';
 import { getCategories } from '@/lib/categories';
@@ -281,6 +282,8 @@ export default function TransactionsPage() {
     transaction: null,
   });
 
+  const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
+
   const createMutation = useMutation({
     mutationFn: async (input: CreateTransactionInput) => createTransaction(input),
     onSuccess: () => {
@@ -303,6 +306,7 @@ export default function TransactionsPage() {
     mutationFn: async (id: string) => deleteTransaction(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      setDeleteTarget(null);
     },
   });
 
@@ -510,7 +514,7 @@ export default function TransactionsPage() {
                             variant="ghost"
                             size="icon"
                             aria-label="削除"
-                            onClick={() => deleteMutation.mutate(tx.id)}
+                            onClick={() => setDeleteTarget(tx)}
                           >
                             <Trash2 className="size-4" />
                           </Button>
@@ -571,7 +575,7 @@ export default function TransactionsPage() {
                                   aria-label="削除"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    deleteMutation.mutate(tx.id);
+                                    setDeleteTarget(tx);
                                   }}
                                 >
                                   <Trash2 className="size-4" />
@@ -589,6 +593,23 @@ export default function TransactionsPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="この取引を削除しますか？"
+        description={
+          deleteTarget
+            ? `${formatDate(deleteTarget.date)} ・ ${getTransactionCategoryLabel(deleteTarget, categoryById)} ・ ${yenFormatter.format(deleteTarget.amount)}（この操作は取り消せません）`
+            : undefined
+        }
+        pending={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+        }}
+      />
     </div>
   );
 }

@@ -45,6 +45,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   createCategory,
   deleteCategory,
@@ -72,6 +73,8 @@ export default function CategoriesPage() {
     category: null,
   });
 
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+
   const upsertMutation = useMutation({
     mutationFn: async ({ id, input }: { id: string | null; input: CreateCategoryInput }) =>
       id ? updateCategory(id, input) : createCategory(input),
@@ -85,6 +88,7 @@ export default function CategoriesPage() {
     mutationFn: async (id: string) => deleteCategory(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['categories'] });
+      setDeleteTarget(null);
     },
   });
 
@@ -147,8 +151,21 @@ export default function CategoriesPage() {
       <CategoryListCard
         categories={sortedCategories}
         onEdit={openEditDialog}
-        onDelete={(id) => deleteMutation.mutate(id)}
+        onDelete={setDeleteTarget}
         onReorder={(orderedIds) => reorderMutation.mutate(orderedIds)}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title={`「${deleteTarget?.name ?? ''}」を削除しますか？`}
+        description="この操作は取り消せません。"
+        pending={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+        }}
       />
     </div>
   );
@@ -162,7 +179,7 @@ function CategoryListCard({
 }: {
   categories: Category[];
   onEdit: (category: Category) => void;
-  onDelete: (id: string) => void;
+  onDelete: (category: Category) => void;
   onReorder: (orderedIds: string[]) => void;
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -217,7 +234,7 @@ function SortableCategoryRow({
 }: {
   category: Category;
   onEdit: (category: Category) => void;
-  onDelete: (id: string) => void;
+  onDelete: (category: Category) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: category.id,
@@ -263,7 +280,7 @@ function SortableCategoryRow({
           variant="ghost"
           size="icon"
           aria-label="削除"
-          onClick={() => onDelete(category.id)}
+          onClick={() => onDelete(category)}
         >
           <Trash2 className="size-4" />
         </Button>

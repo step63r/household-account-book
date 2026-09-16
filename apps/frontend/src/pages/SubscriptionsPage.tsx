@@ -48,6 +48,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { getCategories } from '@/lib/categories';
 import {
   createSubscription,
@@ -97,6 +98,8 @@ export default function SubscriptionsPage() {
     subscription: null,
   });
 
+  const [deleteTarget, setDeleteTarget] = useState<Subscription | null>(null);
+
   const upsertMutation = useMutation({
     mutationFn: async ({ id, input }: { id: string | null; input: CreateSubscriptionInput }) =>
       id ? updateSubscription(id, input) : createSubscription(input),
@@ -110,6 +113,7 @@ export default function SubscriptionsPage() {
     mutationFn: async (id: string) => deleteSubscription(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
+      setDeleteTarget(null);
     },
   });
 
@@ -206,7 +210,7 @@ export default function SubscriptionsPage() {
                       subscription={sub}
                       categoryName={categoryById.get(sub.categoryId)?.name ?? '未分類'}
                       onEdit={openEditDialog}
-                      onDelete={(id) => deleteMutation.mutate(id)}
+                      onDelete={setDeleteTarget}
                     />
                   ))}
                 </ul>
@@ -215,6 +219,19 @@ export default function SubscriptionsPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title={`「${deleteTarget?.name ?? ''}」を削除しますか？`}
+        description="この操作は取り消せません。"
+        pending={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+        }}
+      />
     </div>
   );
 }
@@ -228,7 +245,7 @@ function SortableSubscriptionRow({
   subscription: Subscription;
   categoryName: string;
   onEdit: (subscription: Subscription) => void;
-  onDelete: (id: string) => void;
+  onDelete: (subscription: Subscription) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: subscription.id,
@@ -283,7 +300,7 @@ function SortableSubscriptionRow({
           variant="ghost"
           size="icon"
           aria-label="削除"
-          onClick={() => onDelete(subscription.id)}
+          onClick={() => onDelete(subscription)}
         >
           <Trash2 className="size-4" />
         </Button>
