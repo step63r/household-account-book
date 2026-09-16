@@ -2,7 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   createSubscriptionInputSchema,
   type Category,
@@ -45,6 +53,7 @@ import {
   createSubscription,
   deleteSubscription,
   getSubscriptions,
+  reorderSubscriptions,
   updateSubscription,
 } from '@/lib/subscriptions';
 import { EMPTY_ARRAY } from '@/lib/utils';
@@ -78,6 +87,7 @@ export default function SubscriptionsPage() {
   const subscriptions = subscriptionsQuery.data ?? EMPTY_ARRAY;
   const categories = categoriesQuery.data ?? EMPTY_ARRAY;
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   const [dialogState, setDialogState] = useState<{
     open: boolean;
@@ -99,6 +109,28 @@ export default function SubscriptionsPage() {
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => deleteSubscription(id),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
+    },
+  });
+
+  const reorderMutation = useMutation({
+    mutationFn: (orderedIds: string[]) => reorderSubscriptions(orderedIds),
+    onMutate: async (orderedIds: string[]) => {
+      await queryClient.cancelQueries({ queryKey: ['subscriptions'] });
+      const previous = queryClient.getQueryData<Subscription[]>(['subscriptions']);
+      queryClient.setQueryData<Subscription[]>(['subscriptions'], (old) => {
+        if (!old) return old;
+        const orderMap = new Map(orderedIds.map((id, index) => [id, index]));
+        return old.map((s) => ({ ...s, sortOrder: orderMap.get(s.id) ?? s.sortOrder }));
+      });
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['subscriptions'], context.previous);
+      }
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
     },
   });
@@ -150,52 +182,113 @@ export default function SubscriptionsPage() {
               サブスクリプションが登録されていません
             </p>
           ) : (
-            <ul className="flex flex-col divide-y divide-border">
-              {subscriptions.map((sub) => (
-                <li key={sub.id} className="flex items-center justify-between gap-2 py-2.5">
-                  <div
-                    className={
-                      sub.isActive
-                        ? 'flex flex-col gap-0.5'
-                        : 'flex flex-col gap-0.5 text-muted-foreground'
-                    }
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-medium">{sub.name}</span>
-                      {!sub.isActive && <Badge variant="secondary">無効</Badge>}
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {categoryById.get(sub.categoryId)?.name ?? '未分類'} ・{' '}
-                      {yenFormatter.format(sub.amount)} ・ {billingScheduleLabel(sub)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label="編集"
-                      onClick={() => openEditDialog(sub)}
-                    >
-                      <Pencil className="size-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label="削除"
-                      onClick={() => deleteMutation.mutate(sub.id)}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={(event) => {
+                const { active, over } = event;
+                if (!over || active.id === over.id) return;
+                const oldIndex = subscriptions.findIndex((s) => s.id === active.id);
+                const newIndex = subscriptions.findIndex((s) => s.id === over.id);
+                reorderMutation.mutate(
+                  arrayMove([...subscriptions], oldIndex, newIndex).map((s) => s.id),
+                );
+              }}
+            >
+              <SortableContext
+                items={subscriptions.map((s) => s.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <ul className="flex flex-col divide-y divide-border">
+                  {subscriptions.map((sub) => (
+                    <SortableSubscriptionRow
+                      key={sub.id}
+                      subscription={sub}
+                      categoryName={categoryById.get(sub.categoryId)?.name ?? '未分類'}
+                      onEdit={openEditDialog}
+                      onDelete={(id) => deleteMutation.mutate(id)}
+                    />
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
           )}
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function SortableSubscriptionRow({
+  subscription,
+  categoryName,
+  onEdit,
+  onDelete,
+}: {
+  subscription: Subscription;
+  categoryName: string;
+  onEdit: (subscription: Subscription) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: subscription.id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <li ref={setNodeRef} style={style} className="flex items-center justify-between gap-2 py-2.5">
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+          aria-label="ドラッグして並び替え"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="size-4" />
+        </button>
+        <div
+          className={
+            subscription.isActive
+              ? 'flex flex-col gap-0.5'
+              : 'flex flex-col gap-0.5 text-muted-foreground'
+          }
+        >
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-medium">{subscription.name}</span>
+            {!subscription.isActive && <Badge variant="secondary">無効</Badge>}
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {categoryName} ・ {yenFormatter.format(subscription.amount)} ・{' '}
+            {billingScheduleLabel(subscription)}
+          </span>
+        </div>
+      </div>
+      <div className="flex items-center gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="編集"
+          onClick={() => onEdit(subscription)}
+        >
+          <Pencil className="size-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="削除"
+          onClick={() => onDelete(subscription.id)}
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      </div>
+    </li>
   );
 }
 

@@ -2,10 +2,19 @@ import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   createCategoryInputSchema,
   type Category,
+  type CategoryType,
   type CreateCategoryInput,
 } from '@household/shared';
 
@@ -36,7 +45,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
-import { createCategory, deleteCategory, getCategories, updateCategory } from '@/lib/categories';
+import {
+  createCategory,
+  deleteCategory,
+  getCategories,
+  reorderCategories,
+  updateCategory,
+} from '@/lib/categories';
 import { EMPTY_ARRAY } from '@/lib/utils';
 
 export default function CategoriesPage() {
@@ -74,6 +89,31 @@ export default function CategoriesPage() {
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => deleteCategory(id),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['categories'] });
+    },
+  });
+
+  const reorderMutation = useMutation({
+    mutationFn: ({ type, orderedIds }: { type: CategoryType; orderedIds: string[] }) =>
+      reorderCategories(type, orderedIds),
+    onMutate: async ({ type, orderedIds }) => {
+      await queryClient.cancelQueries({ queryKey: ['categories'] });
+      const previous = queryClient.getQueryData<Category[]>(['categories']);
+      queryClient.setQueryData<Category[]>(['categories'], (old) => {
+        if (!old) return old;
+        const orderMap = new Map(orderedIds.map((id, index) => [id, index]));
+        return old.map((c) =>
+          c.type === type ? { ...c, sortOrder: orderMap.get(c.id) ?? c.sortOrder } : c,
+        );
+      });
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['categories'], context.previous);
+      }
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['categories'] });
     },
   });
@@ -117,12 +157,14 @@ export default function CategoriesPage() {
         categories={grouped.fixed}
         onEdit={openEditDialog}
         onDelete={(id) => deleteMutation.mutate(id)}
+        onReorder={(orderedIds) => reorderMutation.mutate({ type: 'fixed', orderedIds })}
       />
       <CategoryGroupCard
         title="変動費"
         categories={grouped.variable}
         onEdit={openEditDialog}
         onDelete={(id) => deleteMutation.mutate(id)}
+        onReorder={(orderedIds) => reorderMutation.mutate({ type: 'variable', orderedIds })}
       />
     </div>
   );
@@ -133,12 +175,16 @@ function CategoryGroupCard({
   categories,
   onEdit,
   onDelete,
+  onReorder,
 }: {
   title: string;
   categories: Category[];
   onEdit: (category: Category) => void;
   onDelete: (id: string) => void;
+  onReorder: (orderedIds: string[]) => void;
 }) {
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+
   return (
     <Card>
       <CardHeader>
@@ -149,39 +195,95 @@ function CategoryGroupCard({
         {categories.length === 0 ? (
           <p className="py-4 text-sm text-muted-foreground">費目がありません</p>
         ) : (
-          <ul className="flex flex-col divide-y divide-border">
-            {categories.map((c) => (
-              <li key={c.id} className="flex items-center justify-between gap-2 py-2.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-medium">{c.name}</span>
-                  {c.tooltip && <InfoTooltip label={`${c.name}の説明`}>{c.tooltip}</InfoTooltip>}
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="編集"
-                    onClick={() => onEdit(c)}
-                  >
-                    <Pencil className="size-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="削除"
-                    onClick={() => onDelete(c.id)}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={(event) => {
+              const { active, over } = event;
+              if (!over || active.id === over.id) return;
+              const oldIndex = categories.findIndex((c) => c.id === active.id);
+              const newIndex = categories.findIndex((c) => c.id === over.id);
+              onReorder(arrayMove(categories, oldIndex, newIndex).map((c) => c.id));
+            }}
+          >
+            <SortableContext
+              items={categories.map((c) => c.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <ul className="flex flex-col divide-y divide-border">
+                {categories.map((c) => (
+                  <SortableCategoryRow
+                    key={c.id}
+                    category={c}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                  />
+                ))}
+              </ul>
+            </SortableContext>
+          </DndContext>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function SortableCategoryRow({
+  category,
+  onEdit,
+  onDelete,
+}: {
+  category: Category;
+  onEdit: (category: Category) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: category.id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <li ref={setNodeRef} style={style} className="flex items-center justify-between gap-2 py-2.5">
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+          aria-label="ドラッグして並び替え"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="size-4" />
+        </button>
+        <span className="text-sm font-medium">{category.name}</span>
+        {category.tooltip && (
+          <InfoTooltip label={`${category.name}の説明`}>{category.tooltip}</InfoTooltip>
+        )}
+      </div>
+      <div className="flex items-center gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="編集"
+          onClick={() => onEdit(category)}
+        >
+          <Pencil className="size-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="削除"
+          onClick={() => onDelete(category.id)}
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      </div>
+    </li>
   );
 }
 

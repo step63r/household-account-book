@@ -87,6 +87,20 @@ function buildRoutes(props: ApiStackProps): RouteDef[] {
       handlerFile: 'deleteCategory',
       dynamoActions: ['dynamodb:GetItem', 'dynamodb:DeleteItem'],
     },
+    {
+      method: apigwv2.HttpMethod.PUT,
+      path: '/categories/reorder',
+      handlerFile: 'reorderCategories',
+      // GetItem/PutItem = getUserContext's householdId lookup (+ lazy bootstrap), see
+      // updateCategory.ts above. Query = reading the existing categories to validate the
+      // reorder request. BatchWriteItem = persisting the new sortOrder values.
+      dynamoActions: [
+        'dynamodb:GetItem',
+        'dynamodb:PutItem',
+        'dynamodb:Query',
+        'dynamodb:BatchWriteItem',
+      ],
+    },
     // Subscriptions - apps/backend/src/{handlers,services}/*Subscription*.ts. No preset seeding
     // (unlike categories), so no BatchWriteItem and POST needs no Query for existing items.
     {
@@ -114,6 +128,20 @@ function buildRoutes(props: ApiStackProps): RouteDef[] {
       path: '/subscriptions/{id}',
       handlerFile: 'deleteSubscription',
       dynamoActions: ['dynamodb:GetItem', 'dynamodb:DeleteItem'],
+    },
+    {
+      method: apigwv2.HttpMethod.PUT,
+      path: '/subscriptions/reorder',
+      handlerFile: 'reorderSubscriptions',
+      // GetItem/PutItem = getUserContext's householdId lookup (+ lazy bootstrap), see
+      // updateSubscription.ts above. Query = reading the existing subscriptions to validate the
+      // reorder request. BatchWriteItem = persisting the new sortOrder values.
+      dynamoActions: [
+        'dynamodb:GetItem',
+        'dynamodb:PutItem',
+        'dynamodb:Query',
+        'dynamodb:BatchWriteItem',
+      ],
     },
     // Transactions - handlers currently stubbed (501); actions per each file's TODO comment
     {

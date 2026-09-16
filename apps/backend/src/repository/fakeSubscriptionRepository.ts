@@ -26,6 +26,12 @@ export class FakeSubscriptionRepository implements SubscriptionRepository {
     this.itemsByKey.set(this.key(subscription.householdId, subscription.id), subscription);
   }
 
+  async putAll(subscriptions: Subscription[]): Promise<void> {
+    for (const subscription of subscriptions) {
+      await this.put(subscription);
+    }
+  }
+
   async delete(householdId: string, subscriptionId: string): Promise<void> {
     this.itemsByKey.delete(this.key(householdId, subscriptionId));
   }

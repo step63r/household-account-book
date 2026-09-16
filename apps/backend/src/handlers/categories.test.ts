@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { APIGatewayProxyEventV2WithJWTAuthorizer } from 'aws-lambda';
 import { handler as listCategoriesHandler } from './listCategories';
 import { handler as createCategoryHandler } from './createCategory';
+import { handler as reorderCategoriesHandler } from './reorderCategories';
 
 /**
  * These exercise handler-level concerns (JWT sub extraction, body parsing, status-code
@@ -90,6 +91,46 @@ describe('createCategory handler', () => {
     });
 
     const result = await createCategoryHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 400 });
+  });
+});
+
+describe('reorderCategories handler', () => {
+  it('returns 401 when the JWT sub claim is missing', async () => {
+    const event = buildEvent({
+      body: JSON.stringify({ type: 'fixed', orderedIds: ['a', 'b'] }),
+    });
+
+    const result = await reorderCategoriesHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 401 });
+  });
+
+  it('returns 400 for a missing request body', async () => {
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', { body: undefined });
+
+    const result = await reorderCategoriesHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 400 });
+  });
+
+  it('returns 400 for a payload missing orderedIds', async () => {
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', {
+      body: JSON.stringify({ type: 'fixed' }),
+    });
+
+    const result = await reorderCategoriesHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 400 });
+  });
+
+  it('returns 400 for a payload with an empty orderedIds array', async () => {
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', {
+      body: JSON.stringify({ type: 'fixed', orderedIds: [] }),
+    });
+
+    const result = await reorderCategoriesHandler(event, {} as never, () => undefined);
 
     expect(result).toMatchObject({ statusCode: 400 });
   });

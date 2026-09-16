@@ -4,6 +4,7 @@ import { handler as listSubscriptionsHandler } from './listSubscriptions';
 import { handler as createSubscriptionHandler } from './createSubscription';
 import { handler as updateSubscriptionHandler } from './updateSubscription';
 import { handler as deleteSubscriptionHandler } from './deleteSubscription';
+import { handler as reorderSubscriptionsHandler } from './reorderSubscriptions';
 
 /**
  * These exercise handler-level concerns (JWT sub extraction, body parsing, status-code
@@ -136,5 +137,45 @@ describe('deleteSubscription handler', () => {
     const result = await deleteSubscriptionHandler(event, {} as never, () => undefined);
 
     expect(result).toMatchObject({ statusCode: 401 });
+  });
+});
+
+describe('reorderSubscriptions handler', () => {
+  it('returns 401 when the JWT sub claim is missing', async () => {
+    const event = buildEvent({
+      body: JSON.stringify({ orderedIds: ['a', 'b'] }),
+    });
+
+    const result = await reorderSubscriptionsHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 401 });
+  });
+
+  it('returns 400 for a missing request body', async () => {
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', { body: undefined });
+
+    const result = await reorderSubscriptionsHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 400 });
+  });
+
+  it('returns 400 for a payload missing orderedIds', async () => {
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', {
+      body: JSON.stringify({}),
+    });
+
+    const result = await reorderSubscriptionsHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 400 });
+  });
+
+  it('returns 400 for a payload with an empty orderedIds array', async () => {
+    const event = buildAuthenticatedEvent('user-1', 'user1@example.com', {
+      body: JSON.stringify({ orderedIds: [] }),
+    });
+
+    const result = await reorderSubscriptionsHandler(event, {} as never, () => undefined);
+
+    expect(result).toMatchObject({ statusCode: 400 });
   });
 });

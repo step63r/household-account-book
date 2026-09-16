@@ -20,6 +20,12 @@ export const subscriptionSchema = z.object({
   billingMonth: z.number().int().min(1).max(12).nullable(),
   billingDay: z.number().int().min(1).max(31),
   isActive: z.boolean(),
+  /**
+   * 表示順。既存レコードには存在しない属性のためoptional（マイグレーションは行わない）。
+   * 未設定のレコードはlistSubscriptionsで末尾扱いにフォールバックし、並び替えを一度でも
+   * 行えばそのユーザーの全件にsortOrderが採番される。
+   */
+  sortOrder: z.number().int().nonnegative().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -38,3 +44,9 @@ export type CreateSubscriptionInput = z.infer<typeof createSubscriptionInputSche
 
 export const updateSubscriptionInputSchema = createSubscriptionInputSchema.partial();
 export type UpdateSubscriptionInput = z.infer<typeof updateSubscriptionInputSchema>;
+
+/** サブスクリプションの並び替え（世帯全体でフラットな1リスト）。 */
+export const reorderSubscriptionsInputSchema = z.object({
+  orderedIds: z.array(z.string()).min(1),
+});
+export type ReorderSubscriptionsInput = z.infer<typeof reorderSubscriptionsInputSchema>;

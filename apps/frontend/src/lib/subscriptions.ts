@@ -28,3 +28,10 @@ export function updateSubscription(
 export function deleteSubscription(id: string): Promise<void> {
   return apiFetch<void>(`/subscriptions/${id}`, { method: 'DELETE' });
 }
+
+export function reorderSubscriptions(orderedIds: string[]): Promise<Subscription[]> {
+  return apiFetch<Subscription[]>('/subscriptions/reorder', {
+    method: 'PUT',
+    body: { orderedIds },
+  });
+}

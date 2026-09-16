@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
+import type { Subscription } from '@household/shared';
 import { FakeSubscriptionRepository } from '../repository/fakeSubscriptionRepository';
 import {
   createSubscription,
   deleteSubscription,
   listSubscriptions,
+  reorderSubscriptions,
   updateSubscription,
 } from './subscriptionService';
 import { HttpError, NotFoundError } from '../lib/errors';
@@ -47,6 +49,68 @@ describe('listSubscriptions', () => {
 
     expect(subscriptions).toHaveLength(1);
     expect(subscriptions[0]!.householdId).toBe('user-1');
+  });
+
+  it('sorts by sortOrder, falling back to createdAt for legacy rows without sortOrder', async () => {
+    const repository = new FakeSubscriptionRepository();
+    const withOrder: Subscription = {
+      id: 'with-order',
+      householdId: 'user-1',
+      ...validMonthly,
+      sortOrder: 0,
+      createdAt: '2026-01-03T00:00:00.000Z',
+      updatedAt: '2026-01-03T00:00:00.000Z',
+    };
+    const legacyOlder: Subscription = {
+      id: 'legacy-older',
+      householdId: 'user-1',
+      ...validMonthly,
+      sortOrder: undefined,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    const legacyNewer: Subscription = {
+      id: 'legacy-newer',
+      householdId: 'user-1',
+      ...validMonthly,
+      sortOrder: undefined,
+      createdAt: '2026-01-02T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    };
+    // Insert out of expected order to prove sorting, not insertion order, drives the result.
+    await repository.put(legacyNewer);
+    await repository.put(withOrder);
+    await repository.put(legacyOlder);
+
+    const subscriptions = await listSubscriptions(repository, 'user-1');
+
+    expect(subscriptions.map((s) => s.id)).toEqual(['with-order', 'legacy-older', 'legacy-newer']);
+  });
+
+  it('falls back entirely to createdAt order when no rows have sortOrder', async () => {
+    const repository = new FakeSubscriptionRepository();
+    const older: Subscription = {
+      id: 'older',
+      householdId: 'user-1',
+      ...validMonthly,
+      sortOrder: undefined,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    const newer: Subscription = {
+      id: 'newer',
+      householdId: 'user-1',
+      ...validMonthly,
+      sortOrder: undefined,
+      createdAt: '2026-01-02T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    };
+    await repository.put(newer);
+    await repository.put(older);
+
+    const subscriptions = await listSubscriptions(repository, 'user-1');
+
+    expect(subscriptions.map((s) => s.id)).toEqual(['older', 'newer']);
   });
 });
 
@@ -100,6 +164,34 @@ describe('createSubscription', () => {
     expect(subscription.billingMonth).toBe(4);
     await expect(repository.getById('user-1', subscription.id)).resolves.toEqual(subscription);
   });
+
+  it('assigns sortOrder based on the max existing value, not the item count, when some existing rows have sortOrder undefined (legacy data)', async () => {
+    const repository = new FakeSubscriptionRepository();
+    const legacyNoOrder: Subscription = {
+      id: 'legacy-1',
+      householdId: 'user-1',
+      ...validMonthly,
+      sortOrder: undefined,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    const highSortOrder: Subscription = {
+      id: 'high-order',
+      householdId: 'user-1',
+      ...validMonthly,
+      sortOrder: 5,
+      createdAt: '2026-01-02T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    };
+    await repository.put(legacyNoOrder);
+    await repository.put(highSortOrder);
+
+    const created = await createSubscription(repository, 'user-1', validMonthly);
+
+    // If this used existing.length (2), the new item would get sortOrder 2, which would sort
+    // *before* highSortOrder (5) despite being created later. Using max + 1 avoids that.
+    expect(created.sortOrder).toBe(6);
+  });
 });
 
 describe('updateSubscription', () => {
@@ -142,6 +234,61 @@ describe('updateSubscription', () => {
     expect(updated.isActive).toBe(false);
     expect(updated.name).toBe(subscription.name);
     expect(updated.id).toBe(subscription.id);
+  });
+});
+
+describe('reorderSubscriptions', () => {
+  it('reorders the whole household set and returns sortOrder matching orderedIds order', async () => {
+    const repository = new FakeSubscriptionRepository();
+    const a = await createSubscription(repository, 'user-1', validMonthly);
+    const b = await createSubscription(repository, 'user-1', validYearly);
+    const c = await createSubscription(repository, 'user-1', validMonthly);
+
+    const result = await reorderSubscriptions(repository, 'user-1', {
+      orderedIds: [c.id, a.id, b.id],
+    });
+
+    expect(result.map((s) => s.id)).toEqual([c.id, a.id, b.id]);
+    expect(result.map((s) => s.sortOrder)).toEqual([0, 1, 2]);
+
+    const persisted = await repository.listByHousehold('user-1');
+    expect(persisted.find((s) => s.id === c.id)?.sortOrder).toBe(0);
+    expect(persisted.find((s) => s.id === a.id)?.sortOrder).toBe(1);
+    expect(persisted.find((s) => s.id === b.id)?.sortOrder).toBe(2);
+  });
+
+  it('rejects when orderedIds is missing an existing id', async () => {
+    const repository = new FakeSubscriptionRepository();
+    const a = await createSubscription(repository, 'user-1', validMonthly);
+    await createSubscription(repository, 'user-1', validYearly);
+
+    await expect(
+      reorderSubscriptions(repository, 'user-1', { orderedIds: [a.id] }),
+    ).rejects.toThrow(HttpError);
+  });
+
+  it('rejects when orderedIds contains a foreign/extra id', async () => {
+    const repository = new FakeSubscriptionRepository();
+    const a = await createSubscription(repository, 'user-1', validMonthly);
+    const b = await createSubscription(repository, 'user-1', validYearly);
+
+    await expect(
+      reorderSubscriptions(repository, 'user-1', {
+        orderedIds: [a.id, b.id, 'unknown-id'],
+      }),
+    ).rejects.toThrow(HttpError);
+  });
+
+  it('rejects when orderedIds contains a duplicate id', async () => {
+    const repository = new FakeSubscriptionRepository();
+    const a = await createSubscription(repository, 'user-1', validMonthly);
+    const b = await createSubscription(repository, 'user-1', validYearly);
+
+    await expect(
+      reorderSubscriptions(repository, 'user-1', {
+        orderedIds: [a.id, a.id, b.id],
+      }),
+    ).rejects.toThrow(HttpError);
   });
 });
 

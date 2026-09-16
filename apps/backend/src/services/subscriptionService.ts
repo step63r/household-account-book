@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   createSubscriptionInputSchema,
+  reorderSubscriptionsInputSchema,
   updateSubscriptionInputSchema,
   type Subscription,
   type SubscriptionFrequency,
@@ -31,7 +32,13 @@ export async function listSubscriptions(
   repository: SubscriptionRepository,
   householdId: string,
 ): Promise<Subscription[]> {
-  return repository.listByHousehold(householdId);
+  const items = await repository.listByHousehold(householdId);
+  return items.slice().sort((a, b) => {
+    const aOrder = a.sortOrder ?? Number.POSITIVE_INFINITY;
+    const bOrder = b.sortOrder ?? Number.POSITIVE_INFINITY;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return a.createdAt.localeCompare(b.createdAt);
+  });
 }
 
 export async function createSubscription(
@@ -42,11 +49,18 @@ export async function createSubscription(
   const input = createSubscriptionInputSchema.parse(rawInput);
   assertBillingScheduleRule(input.frequency, input.billingMonth);
 
+  const existing = await repository.listByHousehold(householdId);
+  // Math.max over existing sortOrder values (not existing.length): some existing rows may have
+  // sortOrder === undefined (legacy data), and .length could place a new item earlier than
+  // legacy items once listSubscriptions sorts them.
+  const nextSortOrder = existing.reduce((max, s) => Math.max(max, s.sortOrder ?? -1), -1) + 1;
+
   const now = new Date().toISOString();
   const subscription: Subscription = {
     id: randomUUID(),
     householdId,
     ...input,
+    sortOrder: nextSortOrder,
     createdAt: now,
     updatedAt: now,
   };
@@ -74,6 +88,45 @@ export async function updateSubscription(
   };
   assertBillingScheduleRule(updated.frequency, updated.billingMonth);
   await repository.put(updated);
+  return updated;
+}
+
+/**
+ * サブスクリプションの並び替え（世帯全体でフラットな1リスト）。orderedIdsとDB上の全件集合が
+ * 完全に一致することを検証してから、orderedIdsの並び順で0始まりのsortOrderを振り直す。
+ */
+export async function reorderSubscriptions(
+  repository: SubscriptionRepository,
+  householdId: string,
+  rawInput: unknown,
+): Promise<Subscription[]> {
+  const input = reorderSubscriptionsInputSchema.parse(rawInput);
+
+  const existing = await repository.listByHousehold(householdId);
+
+  const orderedIdSet = new Set(input.orderedIds);
+  if (orderedIdSet.size !== input.orderedIds.length) {
+    throw new HttpError(400, 'orderedIds contains duplicate ids');
+  }
+  const existingIdSet = new Set(existing.map((s) => s.id));
+  if (orderedIdSet.size !== existingIdSet.size) {
+    throw new HttpError(400, 'orderedIds does not match the existing subscription set');
+  }
+  for (const id of input.orderedIds) {
+    if (!existingIdSet.has(id)) {
+      throw new HttpError(400, `orderedIds contains unknown subscription id: ${id}`);
+    }
+  }
+
+  const byId = new Map(existing.map((s) => [s.id, s]));
+  const now = new Date().toISOString();
+  const updated: Subscription[] = input.orderedIds.map((id, index) => ({
+    ...byId.get(id)!,
+    sortOrder: index,
+    updatedAt: now,
+  }));
+
+  await repository.putAll(updated);
   return updated;
 }
 

@@ -10,10 +10,12 @@
  *   POST   /categories
  *   PUT    /categories/:id
  *   DELETE /categories/:id
+ *   PUT    /categories/reorder      (body: { type, orderedIds })
  *   GET    /subscriptions                                   src/lib/subscriptions.ts
  *   POST   /subscriptions
  *   PUT    /subscriptions/:id
  *   DELETE /subscriptions/:id
+ *   PUT    /subscriptions/reorder   (body: { orderedIds })
  *   GET    /transactions?from=YYYY-MM-DD&to=YYYY-MM-DD   src/lib/transactions.ts
  *   POST   /transactions
  *   PUT    /transactions/:id
