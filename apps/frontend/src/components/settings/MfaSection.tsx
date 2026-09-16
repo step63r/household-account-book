@@ -98,7 +98,7 @@ function EnrollDialog({
 
         {secretCode && email && (
           <div className="flex flex-col items-center gap-3">
-            <div className="rounded-md bg-white p-3">
+            <div className="rounded-md border border-white/40 bg-white p-3 shadow-sm">
               <QRCodeSVG value={buildOtpAuthUri(email, secretCode)} size={160} />
             </div>
             <p className="break-all text-center text-xs text-muted-foreground">

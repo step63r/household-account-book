@@ -22,9 +22,9 @@ export function AppShell() {
   const ptr = usePullToRefresh(handleRefresh, mainRef);
 
   return (
-    <div className="flex min-h-svh flex-col bg-background pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:flex-row">
+    <div className="flex min-h-svh flex-col pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:flex-row">
       {/* デスクトップ: サイドバー */}
-      <aside className="hidden shrink-0 border-r border-border md:flex md:w-60 md:flex-col md:gap-1 md:p-4">
+      <aside className="hidden shrink-0 border-r border-white/40 bg-background/50 backdrop-blur-xl md:flex md:w-60 md:flex-col md:gap-1 md:p-4">
         <div className="mb-4 flex items-center gap-2 px-2 py-1">
           <Wallet className="size-6 text-primary" aria-hidden="true" />
           <span className="text-lg font-semibold">家計簿</span>
@@ -51,7 +51,7 @@ export function AppShell() {
       </aside>
 
       {/* モバイル: 上部ヘッダー */}
-      <header className="flex items-center gap-2 border-b border-border px-4 py-3 md:hidden">
+      <header className="flex items-center gap-2 border-b border-white/40 bg-background/70 px-4 py-3 backdrop-blur-xl md:hidden">
         <Wallet className="size-5 text-primary" aria-hidden="true" />
         <span className="text-base font-semibold">家計簿</span>
       </header>
@@ -71,7 +71,7 @@ export function AppShell() {
       </main>
 
       {/* モバイル: 下部タブナビゲーション（アイコンのみ・最低限。残りはハンバーガーメニューから） */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-white/40 bg-background/70 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur-xl md:hidden">
         {MOBILE_TAB_ITEMS.map((item) => (
           <NavLink
             key={item.to}

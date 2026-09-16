@@ -6,7 +6,7 @@ import { LegalContent } from '@/content/legalContent';
 
 export default function TermsOfServicePage() {
   return (
-    <div className="flex min-h-svh items-center justify-center bg-background px-4 py-8">
+    <div className="flex min-h-svh items-center justify-center px-4 py-8">
       <Card className="w-full max-w-2xl">
         <CardHeader className="items-center text-center">
           <ShieldCheck className="mb-2 size-8 text-primary" aria-hidden="true" />

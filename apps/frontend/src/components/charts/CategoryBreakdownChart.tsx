@@ -81,7 +81,7 @@ function CustomTooltip({
   const row = entry.payload;
   const percent = (row.amount / total) * 100;
   return (
-    <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
+    <div className="rounded-md border border-white/30 bg-popover/85 px-3 py-2 text-xs text-popover-foreground shadow-md backdrop-blur-xl">
       <p className="flex items-center gap-2">
         <span
           className="inline-block size-2 rounded-full"

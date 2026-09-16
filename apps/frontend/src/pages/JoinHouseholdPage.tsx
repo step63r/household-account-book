@@ -264,7 +264,7 @@ function BackToLoginLink() {
 
 function CenteredCard({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-svh items-center justify-center bg-background px-4">
+    <div className="flex min-h-svh items-center justify-center px-4">
       <Card className="w-full max-w-sm">{children}</Card>
     </div>
   );

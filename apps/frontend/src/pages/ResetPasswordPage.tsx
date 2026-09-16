@@ -56,7 +56,7 @@ function RequestResetForm() {
 
   if (sent) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-background px-4">
+      <div className="flex min-h-svh items-center justify-center px-4">
         <Card className="w-full max-w-sm">
           <CardHeader className="items-center text-center">
             <MailCheck className="mb-2 size-8 text-primary" aria-hidden="true" />
@@ -78,7 +78,7 @@ function RequestResetForm() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center bg-background px-4">
+    <div className="flex min-h-svh items-center justify-center px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
           <Wallet className="mb-2 size-8 text-primary" aria-hidden="true" />
@@ -144,7 +144,7 @@ function SetNewPasswordForm({ email, code }: { email: string; code: string }) {
 
   if (done) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-background px-4">
+      <div className="flex min-h-svh items-center justify-center px-4">
         <Card className="w-full max-w-sm">
           <CardHeader className="items-center text-center">
             <MailCheck className="mb-2 size-8 text-primary" aria-hidden="true" />
@@ -164,7 +164,7 @@ function SetNewPasswordForm({ email, code }: { email: string; code: string }) {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center bg-background px-4">
+    <div className="flex min-h-svh items-center justify-center px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
           <KeyRound className="mb-2 size-8 text-primary" aria-hidden="true" />

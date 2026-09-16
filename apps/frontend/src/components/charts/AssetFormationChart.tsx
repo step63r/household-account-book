@@ -32,7 +32,7 @@ function CustomTooltip({
   const point = payload[0];
   if (!point) return null;
   return (
-    <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
+    <div className="rounded-md border border-white/30 bg-popover/85 px-3 py-2 text-xs text-popover-foreground shadow-md backdrop-blur-xl">
       <p className="mb-1 font-medium">{label !== undefined ? formatYearMonth(label) : ''}</p>
       <p className="font-medium tabular-nums text-[var(--series-transfer)]">
         {formatYen(point.value)}
