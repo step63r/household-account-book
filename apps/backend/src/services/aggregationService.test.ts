@@ -342,7 +342,8 @@ describe('getBudgetVariance', () => {
     const categoryRepository = new FakeCategoryRepository();
     await categoryRepository.put(makeCategory({ id: 'c1', name: '食費' }));
     await categoryRepository.put(makeCategory({ id: 'c2', name: '交通費' }));
-    // c1: budget + actual. c2: actual only (over-budget-less category). c3: budget only (unused).
+    // c1: budget + actual. c2: actual only (over-budget-less category). c3: budget only, for a
+    // category that no longer exists (e.g. deleted) - should be dropped entirely, see below.
     await budgetRepository.put(
       makeBudget({ yearMonth: '2026-07', categoryId: 'c1', amount: 30000 }),
     );
@@ -390,16 +391,56 @@ describe('getBudgetVariance', () => {
           actualAmount: 1200,
           varianceAmount: 1200,
         },
-        {
-          categoryId: 'c3',
-          categoryName: '未分類',
-          budgetAmount: 5000,
-          actualAmount: 0,
-          varianceAmount: -5000,
-        },
       ]),
     );
-    expect(rows).toHaveLength(3);
+    // c3 (budget-only, category deleted) must not appear - see the dedicated test below.
+    expect(rows).toHaveLength(2);
+  });
+
+  it('drops a budget-only entry once its category has been deleted, but keeps one with actual spending', async () => {
+    const transactionRepository = new FakeTransactionRepository();
+    const budgetRepository = new FakeBudgetRepository();
+    const categoryRepository = new FakeCategoryRepository();
+    // Neither 'deleted-budget-only' nor 'deleted-with-actual' has a category record (simulating
+    // a deleted category). The former has only a leftover budget entry and must be dropped -
+    // there's no UI to view/clear it (BudgetsPage only lists currently-existing categories), so
+    // showing it as a dead "未分類" row would just be confusing noise. The latter has real
+    // spending against it and must still show as "未分類", so the month's actual total isn't
+    // silently understated.
+    await budgetRepository.put(
+      makeBudget({ yearMonth: '2026-07', categoryId: 'deleted-budget-only', amount: 5000 }),
+    );
+    await budgetRepository.put(
+      makeBudget({ yearMonth: '2026-07', categoryId: 'deleted-with-actual', amount: 3000 }),
+    );
+    await transactionRepository.put(
+      makeTransaction({
+        date: '2026-07-10',
+        type: 'expense',
+        amount: 4000,
+        categoryId: 'deleted-with-actual',
+      }),
+    );
+
+    const rows = await getBudgetVariance(
+      transactionRepository,
+      budgetRepository,
+      categoryRepository,
+      'user-1',
+      {
+        yearMonth: '2026-07',
+      },
+    );
+
+    expect(rows).toEqual([
+      {
+        categoryId: 'deleted-with-actual',
+        categoryName: '未分類',
+        budgetAmount: 3000,
+        actualAmount: 4000,
+        varianceAmount: 1000,
+      },
+    ]);
   });
 
   it('sorts variable categories by sortOrder then name, with unclassified rows last', async () => {
@@ -422,6 +463,17 @@ describe('getBudgetVariance', () => {
     );
     await budgetRepository.put(
       makeBudget({ yearMonth: '2026-07', categoryId: 'missing-category', amount: 5000 }),
+    );
+    // A budget-only entry for a missing category would be dropped (see the dedicated test
+    // above) - give it actual spending too so it stays in the result and this test can still
+    // verify unclassified rows sort last.
+    await transactionRepository.put(
+      makeTransaction({
+        date: '2026-07-10',
+        type: 'expense',
+        amount: 5000,
+        categoryId: 'missing-category',
+      }),
     );
 
     const rows = await getBudgetVariance(

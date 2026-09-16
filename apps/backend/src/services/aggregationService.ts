@@ -191,7 +191,17 @@ export async function getBudgetVariance(
 
   const categoryIds = [
     ...new Set([...budgets.map((b) => b.categoryId), ...actualByCategory.keys()]),
-  ].filter((categoryId) => categoryById.get(categoryId)?.type !== 'fixed');
+  ].filter((categoryId) => {
+    const category = categoryById.get(categoryId);
+    if (category) return category.type !== 'fixed';
+    // Category has been deleted (deleteCategory doesn't cascade-delete its budget entries).
+    // Keep it only if there's actual spending against it this month - that's real money spent
+    // and should stay visible so the month's total still adds up, matching getCategoryPivot's
+    // own "未分類" fallback for actuals. A budget-only leftover for a deleted category has no
+    // remaining meaning (BudgetsPage only lists currently-existing categories, so there's no
+    // way to view or clear it) and would just be a dead "未分類" row, so drop it.
+    return actualByCategory.has(categoryId);
+  });
 
   return categoryIds
     .map((categoryId) => {
