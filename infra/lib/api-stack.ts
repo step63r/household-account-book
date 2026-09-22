@@ -102,7 +102,7 @@ function buildRoutes(props: ApiStackProps): RouteDef[] {
       ],
     },
     // Subscriptions - apps/backend/src/{handlers,services}/*Subscription*.ts. No preset seeding
-    // (unlike categories), so no BatchWriteItem and POST needs no Query for existing items.
+    // (unlike categories), so no BatchWriteItem.
     {
       method: apigwv2.HttpMethod.GET,
       path: '/subscriptions',
@@ -115,7 +115,9 @@ function buildRoutes(props: ApiStackProps): RouteDef[] {
       path: '/subscriptions',
       handlerFile: 'createSubscription',
       // GetItem (household-sharing) = getUserContext's householdId lookup, see above.
-      dynamoActions: ['dynamodb:PutItem', 'dynamodb:GetItem'],
+      // Query = createSubscription's listByHousehold read to compute the next sortOrder
+      // (subscriptionService.ts).
+      dynamoActions: ['dynamodb:Query', 'dynamodb:PutItem', 'dynamodb:GetItem'],
     },
     {
       method: apigwv2.HttpMethod.PUT,
