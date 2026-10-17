@@ -357,6 +357,19 @@ export class ApiStack extends cdk.Stack {
       },
     });
 
+    // HttpApi (L2) has no throttle prop on the default stage, so set it via the L1 escape
+    // hatch. Limits sized for personal/family-scale traffic (dashboard load fires 5 parallel
+    // aggregation queries, hence the burst headroom) - just enough to blunt scripted abuse, not
+    // a real capacity plan.
+    const defaultStage = this.httpApi.defaultStage;
+    if (defaultStage) {
+      const cfnStage = defaultStage.node.defaultChild as apigwv2.CfnStage;
+      cfnStage.defaultRouteSettings = {
+        throttlingBurstLimit: 20,
+        throttlingRateLimit: 10,
+      };
+    }
+
     const routes = buildRoutes(props);
     for (const route of routes) {
       const fn = new NodejsFunction(this, `${route.handlerFile}Fn`, {
