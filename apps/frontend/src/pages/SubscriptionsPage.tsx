@@ -362,6 +362,12 @@ function SubscriptionFormDialog({
 
   const frequencyValue = useWatch({ control: form.control, name: 'frequency' });
 
+  // サブスクは基本的に固定費のため選択肢を固定費に絞る。ただし変動費で登録済みの既存データは
+  // 選択肢に無いとSelectが空表示になるため、編集中の費目だけは例外的に残す。
+  const selectableCategories = categories.filter(
+    (c) => c.type === 'fixed' || c.id === subscription?.categoryId,
+  );
+
   const handleSubmit = form.handleSubmit((values) => {
     onSubmit({
       ...values,
@@ -405,7 +411,7 @@ function SubscriptionFormDialog({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {categories.map((c) => (
+                    {selectableCategories.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.name}
                       </SelectItem>
