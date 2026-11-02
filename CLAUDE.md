@@ -55,6 +55,13 @@
 - 退会時のデータ削除: 退会操作時点で論理削除し、30日程度の猶予期間後にバッチで物理削除する
 - コストアラート（AWS Budgets）: AWSアカウント側でBudgets「月間予算」（月次$300、予測ベース100%超過で通知）を設定済み（2026-08-05）。ただしカスタムドメインと同様に本リポジトリのCDK（`infra/lib/monitoring-stack.ts`）では意図的に管理外としており、Budgetsコンソール等リポジトリ外で設定されたものである点に注意。通知先は`uchi63rs@yahoo.co.jp`（`alertEmail`コンテキストの`ryo-uchiyama@minatoproject.com`とは別アドレス）
 - 監査ログ: 更新系APIの操作ログをCloudWatch Logsに残す
+- アクセス解析: Google Analytics 4（`apps/frontend/src/lib/analytics.ts`、ルート遷移ごとの送信は`AnalyticsPageView.tsx`）を導入済み（2026-11-02）。以下の制約を崩さないこと
+  - ページビューは**クエリ・ハッシュを除いた`origin + pathname`だけ**を手動送信する（`send_page_view: false`）。理由: URLのクエリに個人情報・秘匿情報が載るため。パスワードリセットの`?email=&code=`、招待リンクの`?token=`、ログイン後リダイレクトの`?redirect=`（招待トークン入りのパスを含みうる）が該当し、GAに送ると第三者（Google）へ漏れる。GA4側の自動送信は生URLを送るので使わない
+  - GA4管理画面の「拡張計測機能」は**全体をOFF**にしている。ONのままだと「ページの変更に基づくページビュー」が生URL（クエリ込み）でpage_viewを自動送信し、上記の対策が無効になり二重計測にもなる。拡張計測機能の個別項目（サイト内検索・フォーム操作など）も、家計簿の入力内容に触れうるため有効化しない
+  - `allow_google_signals` / `allow_ad_personalization_signals`は無効。プライバシーポリシー（`legalContent.tsx`）の「広告配信・行動追跡を目的としない」という記載との整合のため
+  - `import.meta.env.PROD`かつ`VITE_GA_MEASUREMENT_ID`設定時のみ有効。`pnpm dev`では送信しない（本番統計を汚さないため）
+  - 測定IDは秘匿情報ではなく、`infra/cdk.json`の`context.gaMeasurementId`から`HostingStack`経由でAmplifyのビルド環境変数`VITE_GA_MEASUREMENT_ID`に注入する。Amplifyコンソールで手動追加するとCDKデプロイで消えるため、必ずCDK経由にする
+  - GAの利用内容を変える（送信項目の追加、広告機能の有効化など）場合は、プライバシーポリシー本文の更新と`packages/shared/src/consent.ts`の`CURRENT_TERMS_VERSION`更新（全ユーザーへの再同意要求）が必要
 
 ## リポジトリ構成
 
