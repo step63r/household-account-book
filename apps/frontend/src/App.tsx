@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { AppShell } from '@/components/layout/AppShell';
+import { AnalyticsPageView } from '@/components/AnalyticsPageView';
 import { ScrollToTop } from '@/components/ScrollToTop';
 import DashboardPage from '@/pages/DashboardPage';
 import TransactionsPage from '@/pages/TransactionsPage';
@@ -20,6 +21,7 @@ function App() {
   return (
     <>
       <ScrollToTop />
+      <AnalyticsPageView />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />

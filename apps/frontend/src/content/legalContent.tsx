@@ -140,6 +140,10 @@ export function PrivacyPolicyContent() {
         <ul className="list-inside list-disc">
           <li>法令に基づき開示が求められる場合</li>
           <li>
+            アクセス解析のため、Google LLCの「Google アナリティクス」に匿名の利用状況データを
+            送信する場合（個人情報・家計簿データは含みません。詳細は「7. Cookie等の利用」参照）
+          </li>
+          <li>
             本サービスの稼働に必要なクラウドインフラ（Amazon Web Services:
             Cognito・DynamoDB・Lambda・API Gateway・Amplify Hosting・SES等）に処理を委託する場合
             （下記「5. 委託」参照）
@@ -173,6 +177,26 @@ export function PrivacyPolicyContent() {
         <p>
           本サービスは広告配信・行動追跡を目的としたCookieやトラッキング技術は使用しません。
           ログインセッションの維持のため、認証情報をブラウザのlocalStorageに保存します。
+        </p>
+        <p>
+          本サービスの利用状況を把握し改善するため、Google LLCが提供するアクセス解析サービス
+          「Google アナリティクス」を利用しています。Google
+          アナリティクスはCookieを使用して、閲覧されたページのパス・端末やブラウザの種類・
+          おおよその地域などの利用状況データを収集します。このデータは匿名で収集され、
+          個人を特定するものではありません。メールアドレスや家計簿データ（取引・予算・費目等）、
+          およびURLに含まれるクエリ情報はGoogleアナリティクスに送信しません。
+          Googleシグナルや広告向けの機能は使用しません。収集されたデータはGoogleのプライバシーポリシーに
+          従って管理されます。Cookieはブラウザの設定で無効にできますが、その場合も本サービスは
+          ご利用いただけます。また、
+          <a
+            href="https://tools.google.com/dlpage/gaoptout"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline"
+          >
+            Google アナリティクス オプトアウト アドオン
+          </a>
+          により収集を無効にすることもできます。
         </p>
       </section>
 

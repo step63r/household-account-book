@@ -17,6 +17,11 @@ export interface HostingStackProps extends cdk.StackProps {
   readonly userPoolClientId: string;
   /** Baked into the frontend build as VITE_API_BASE_URL. */
   readonly apiEndpoint: string;
+  /**
+   * Baked into the frontend build as VITE_GA_MEASUREMENT_ID - set via `-c gaMeasurementId=G-...`
+   * (or infra/cdk.json). Omitted entirely when unset, which leaves Google Analytics disabled.
+   */
+  readonly gaMeasurementId?: string;
 }
 
 /**
@@ -49,6 +54,9 @@ export class HostingStack extends cdk.Stack {
         VITE_API_BASE_URL: props.apiEndpoint,
         VITE_COGNITO_USER_POOL_ID: props.userPoolId,
         VITE_COGNITO_CLIENT_ID: props.userPoolClientId,
+        // Must live here rather than in the Amplify console: CDK owns the whole variable set, so
+        // a console-added variable would be wiped on the next deploy.
+        ...(props.gaMeasurementId ? { VITE_GA_MEASUREMENT_ID: props.gaMeasurementId } : {}),
       },
       // The frontend is a client-side-routed SPA (React Router), so a direct request for e.g.
       // /transactions has no matching object in the Amplify Hosting bucket and 404s unless

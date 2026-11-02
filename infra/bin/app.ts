@@ -20,6 +20,7 @@ const alertEmail: string | undefined = app.node.tryGetContext('alertEmail') || u
 const amplifyGithubRepoUrl: string | undefined =
   app.node.tryGetContext('amplifyGithubRepoUrl') || undefined;
 const frontendBaseUrl: string | undefined = app.node.tryGetContext('frontendBaseUrl') || undefined;
+const gaMeasurementId: string | undefined = app.node.tryGetContext('gaMeasurementId') || undefined;
 
 // Same account/region for every stack in a stage; account/region are only known at synth/deploy
 // time via the default AWS CLI environment, never hardcoded here.
@@ -58,6 +59,7 @@ new HostingStack(app, `${stackNamePrefix}-Hosting`, {
   userPoolId: authStack.userPool.userPoolId,
   userPoolClientId: authStack.userPoolClient.userPoolClientId,
   apiEndpoint: apiStack.httpApi.apiEndpoint,
+  gaMeasurementId,
 });
 
 new MonitoringStack(app, `${stackNamePrefix}-Monitoring`, {
