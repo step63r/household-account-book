@@ -13,6 +13,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   createSubscriptionInputSchema,
+  resolvePlanFloorDateString,
   type Category,
   type CreateSubscriptionInput,
   type Subscription,
@@ -57,7 +58,14 @@ import {
   reorderSubscriptions,
   updateSubscription,
 } from '@/lib/subscriptions';
+import { addMonthsToDate, clampDateFrom, todayJst } from '@/lib/date';
+import { useUserProfile } from '@/lib/profile';
+import { recommendedSubscriptionBudget } from '@/lib/recommendedBudget';
+import { getTransactions } from '@/lib/transactions';
 import { EMPTY_ARRAY } from '@/lib/utils';
+
+/** 推奨予算の算出で遡る月数の上限 */
+const RECOMMENDED_BUDGET_LOOKBACK_MONTHS = 12;
 
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -361,6 +369,35 @@ function SubscriptionFormDialog({
   }, [open]);
 
   const frequencyValue = useWatch({ control: form.control, name: 'frequency' });
+  const nameValue = useWatch({ control: form.control, name: 'name' });
+  const categoryIdValue = useWatch({ control: form.control, name: 'categoryId' });
+
+  // 無料プランは参照可能期間が直近3ヶ月までで、範囲外を含めると403になるためfloorに合わせて絞る。
+  // プラン未確定の間はfloorが分からないので取得しない。
+  const profileQuery = useUserProfile();
+  const plan = profileQuery.data?.plan;
+  const budgetRange = useMemo(() => {
+    const today = todayJst();
+    const floorDate = plan === 'free' ? resolvePlanFloorDateString('free', new Date()) : undefined;
+    return {
+      from: clampDateFrom(addMonthsToDate(today, -RECOMMENDED_BUDGET_LOOKBACK_MONTHS), floorDate),
+      to: today,
+    };
+  }, [plan]);
+  // 名前・費目の入力のたびに再取得しないよう、取引は期間全体を1回だけ取得してクライアント側で絞り込む
+  const budgetTransactionsQuery = useQuery({
+    queryKey: ['transactions', budgetRange.from, budgetRange.to],
+    queryFn: async () => getTransactions(budgetRange),
+    enabled: open && plan !== undefined,
+  });
+  const recommendedBudget = useMemo(
+    () =>
+      recommendedSubscriptionBudget(budgetTransactionsQuery.data ?? EMPTY_ARRAY, {
+        name: nameValue ?? '',
+        categoryId: categoryIdValue ?? '',
+      }),
+    [budgetTransactionsQuery.data, nameValue, categoryIdValue],
+  );
 
   // サブスクは基本的に固定費のため選択肢を固定費に絞る。ただし変動費で登録済みの既存データは
   // 選択肢に無いとSelectが空表示になるため、編集中の費目だけは例外的に残す。
@@ -432,6 +469,11 @@ function SubscriptionFormDialog({
                 <FormControl>
                   <AmountInput {...field} />
                 </FormControl>
+                {recommendedBudget !== null && (
+                  <p className="text-xs text-muted-foreground">
+                    推奨の予算：{recommendedBudget.toLocaleString('ja-JP')} 円
+                  </p>
+                )}
                 <FormMessage />
               </FormItem>
             )}
