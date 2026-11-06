@@ -103,6 +103,8 @@
     "alertEmail": "ryo-uchiyama@minatoproject.com",
     "amplifyGithubRepoUrl": "https://github.com/step63r/household-account-book",
     "frontendBaseUrl": "https://household.minatoproject.com",
-    "gaMeasurementId": "G-PFZ836D1VE"
+    "gaMeasurementId": "G-PFZ836D1VE",
+    "apiDomainName": "api.household.minatoproject.com",
+    "apiCertificateArn": "arn:aws:acm:ap-northeast-1:966191971257:certificate/47b51a70-53cd-4a89-8c3d-cf454cccbea3"
   }
 }

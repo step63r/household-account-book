@@ -3,6 +3,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpJwtAuthorizer } from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import type * as cognito from 'aws-cdk-lib/aws-cognito';
 import type * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -24,6 +25,14 @@ export interface ApiStackProps extends cdk.StackProps {
   /** Base URL of the frontend, embedded in invite-email links by createInvite. Same value
    *  passed to AuthStack for its password-reset emails - reused, not recomputed. */
   readonly frontendBaseUrl?: string;
+  /** Custom domain for the API (e.g. api.household.minatoproject.com). Must be given together
+   *  with `apiCertificateArn`; omit both to keep serving only the default execute-api URL. */
+  readonly apiDomainName?: string;
+  /** ARN of an already-issued ACM certificate for `apiDomainName`. It must live in this stack's
+   *  region (HTTP API regional custom domains cannot use us-east-1 certs). Deliberately created
+   *  outside CDK: DNS validation is done by hand in Cloudflare, so a CDK-managed certificate
+   *  would block the deploy until someone adds the validation record. */
+  readonly apiCertificateArn?: string;
 }
 
 interface RouteDef {
@@ -342,8 +351,26 @@ export class ApiStack extends cdk.Stack {
       jwtAudience: [props.userPoolClient.userPoolClientId],
     });
 
+    if (Boolean(props.apiDomainName) !== Boolean(props.apiCertificateArn)) {
+      throw new Error('apiDomainName and apiCertificateArn must be set together (or both omitted)');
+    }
+    // The CNAME pointing at the regional domain name is created by hand in Cloudflare (DNS only,
+    // not proxied), so no Route 53 record is managed here.
+    const apiDomain =
+      props.apiDomainName && props.apiCertificateArn
+        ? new apigwv2.DomainName(this, 'ApiDomain', {
+            domainName: props.apiDomainName,
+            certificate: acm.Certificate.fromCertificateArn(
+              this,
+              'ApiCertificate',
+              props.apiCertificateArn,
+            ),
+          })
+        : undefined;
+
     this.httpApi = new apigwv2.HttpApi(this, 'HttpApi', {
       apiName: `household-${props.stage}-api`,
+      defaultDomainMapping: apiDomain ? { domainName: apiDomain } : undefined,
       // Auth itself goes straight to Cognito from the frontend (not proxied through this API), so
       // every route defaults to the JWT authorizer. The lone exception is GET /invites/{token}
       // (authorizer: 'none' in ROUTES) - a person clicking an invite email link isn't logged in yet.
@@ -414,5 +441,9 @@ export class ApiStack extends cdk.Stack {
     );
 
     new cdk.CfnOutput(this, 'ApiEndpoint', { value: this.httpApi.apiEndpoint });
+    if (apiDomain) {
+      // Target for the Cloudflare CNAME record.
+      new cdk.CfnOutput(this, 'ApiRegionalDomainName', { value: apiDomain.regionalDomainName });
+    }
   }
 }

@@ -21,6 +21,9 @@ const amplifyGithubRepoUrl: string | undefined =
   app.node.tryGetContext('amplifyGithubRepoUrl') || undefined;
 const frontendBaseUrl: string | undefined = app.node.tryGetContext('frontendBaseUrl') || undefined;
 const gaMeasurementId: string | undefined = app.node.tryGetContext('gaMeasurementId') || undefined;
+const apiDomainName: string | undefined = app.node.tryGetContext('apiDomainName') || undefined;
+const apiCertificateArn: string | undefined =
+  app.node.tryGetContext('apiCertificateArn') || undefined;
 
 // Same account/region for every stack in a stage; account/region are only known at synth/deploy
 // time via the default AWS CLI environment, never hardcoded here.
@@ -50,6 +53,8 @@ const apiStack = new ApiStack(app, `${stackNamePrefix}-Api`, {
   // Same value passed to AuthStack above (for its password-reset emails) - reused, not
   // recomputed, for createInvite.ts's invite-email links.
   frontendBaseUrl,
+  apiDomainName,
+  apiCertificateArn,
 });
 
 new HostingStack(app, `${stackNamePrefix}-Hosting`, {
@@ -58,7 +63,8 @@ new HostingStack(app, `${stackNamePrefix}-Hosting`, {
   githubRepoUrl: amplifyGithubRepoUrl,
   userPoolId: authStack.userPool.userPoolId,
   userPoolClientId: authStack.userPoolClient.userPoolClientId,
-  apiEndpoint: apiStack.httpApi.apiEndpoint,
+  // Prefer the custom domain so the frontend isn't coupled to the auto-generated execute-api host.
+  apiEndpoint: apiDomainName ? `https://${apiDomainName}` : apiStack.httpApi.apiEndpoint,
   gaMeasurementId,
 });
 
