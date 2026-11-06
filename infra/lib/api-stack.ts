@@ -368,17 +368,27 @@ export class ApiStack extends cdk.Stack {
           })
         : undefined;
 
+    // Origin only (no path/trailing slash), as browsers send it. The Vite dev origin is kept
+    // because local `pnpm dev` talks to this same prod API (there is no dev stage); CORS is not
+    // an auth boundary here - every route still requires the JWT. Falls back to '*' only when no
+    // frontend URL was configured, so a context-less synth keeps working.
+    const corsAllowOrigins = props.frontendBaseUrl
+      ? [new URL(props.frontendBaseUrl).origin, 'http://localhost:5173']
+      : ['*'];
+
     this.httpApi = new apigwv2.HttpApi(this, 'HttpApi', {
       apiName: `household-${props.stage}-api`,
       defaultDomainMapping: apiDomain ? { domainName: apiDomain } : undefined,
+      // Only safe once the custom domain exists: with it off and no domain, the API would have no
+      // reachable URL at all. Closing the default execute-api host keeps traffic on the domain
+      // (and any future edge protection placed in front of it).
+      disableExecuteApiEndpoint: apiDomain ? true : undefined,
       // Auth itself goes straight to Cognito from the frontend (not proxied through this API), so
       // every route defaults to the JWT authorizer. The lone exception is GET /invites/{token}
       // (authorizer: 'none' in ROUTES) - a person clicking an invite email link isn't logged in yet.
       defaultAuthorizer: authorizer,
       corsPreflight: {
-        // TODO: narrow to the Amplify app's actual domain once the frontend is hosted -
-        // left wide open because that domain doesn't exist yet (HostingStack placeholder).
-        allowOrigins: ['*'],
+        allowOrigins: corsAllowOrigins,
         allowMethods: [apigwv2.CorsHttpMethod.ANY],
         allowHeaders: ['Authorization', 'Content-Type'],
       },
@@ -440,10 +450,12 @@ export class ApiStack extends cdk.Stack {
       }),
     );
 
-    new cdk.CfnOutput(this, 'ApiEndpoint', { value: this.httpApi.apiEndpoint });
     if (apiDomain) {
-      // Target for the Cloudflare CNAME record.
+      // Target for the Cloudflare CNAME record. The default execute-api endpoint is disabled in
+      // this case, and CDK refuses to read `apiEndpoint` then, so it gets no output.
       new cdk.CfnOutput(this, 'ApiRegionalDomainName', { value: apiDomain.regionalDomainName });
+    } else {
+      new cdk.CfnOutput(this, 'ApiEndpoint', { value: this.httpApi.apiEndpoint });
     }
   }
 }
