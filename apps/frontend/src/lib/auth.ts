@@ -21,10 +21,13 @@
  */
 import {
   AuthenticationDetails,
+  CognitoAccessToken,
+  CognitoIdToken,
+  CognitoRefreshToken,
   CognitoUser,
   CognitoUserAttribute,
   CognitoUserPool,
-  type CognitoUserSession,
+  CognitoUserSession,
 } from 'amazon-cognito-identity-js';
 
 export type EmailPasswordCredentials = {
@@ -69,7 +72,7 @@ function getCognitoUser(email: string): CognitoUser {
 }
 
 /** Cognito の例外オブジェクト（`{ code, message, name }` 形式）から表示用メッセージを取り出す。 */
-function describeCognitoError(error: unknown, fallback: string): string {
+export function describeCognitoError(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
   if (
     error &&
@@ -199,6 +202,32 @@ export async function confirmForgotPassword({
         reject(new Error(describeCognitoError(err, 'パスワードの再設定に失敗しました'))),
     });
   });
+}
+
+export type SessionTokens = {
+  idToken: string;
+  accessToken: string;
+  refreshToken: string;
+};
+
+/**
+ * SDK の `authenticateUser` を経由せずに得たトークン（パスキーログイン等）を、SRP ログインと同じ
+ * 形式で永続化する。以後の `getCurrentSession` / `getAuthToken` / `RequireAuth` は無改修で動く。
+ *
+ * 保存キーに使うユーザー名は ID トークンの `cognito:username` にする。SRP ログインでは SDK が
+ * `USER_ID_FOR_SRP`（= Cognito 内部のユーザー名で、メールではない）をキーにするため、ここでメールを
+ * 使うと同一ユーザーのトークンが別キーに二重に残り、ログアウトでも一方が消えない。
+ */
+export function establishSession(email: string, tokens: SessionTokens): void {
+  const idToken = new CognitoIdToken({ IdToken: tokens.idToken });
+  const username = idToken.decodePayload()['cognito:username'];
+  const session = new CognitoUserSession({
+    IdToken: idToken,
+    AccessToken: new CognitoAccessToken({ AccessToken: tokens.accessToken }),
+    RefreshToken: new CognitoRefreshToken({ RefreshToken: tokens.refreshToken }),
+  });
+  const user = getCognitoUser(typeof username === 'string' && username ? username : email);
+  user.setSignInUserSession(session);
 }
 
 /** ログアウト。ローカルに保存されたセッション情報を破棄する（Cognito 側の失効はしない `signOut`）。 */

@@ -31,6 +31,10 @@ export interface AuthStackProps extends cdk.StackProps {
  * - `mfa: Mfa.OPTIONAL` with `mfaSecondFactor: { otp: true, sms: false }` lets users opt into
  *   TOTP (authenticator app, e.g. Microsoft Authenticator) MFA from the Settings screen, without
  *   requiring it pool-wide. SMS is deliberately not enabled (no SNS/origination number setup).
+ * - Passkeys (WebAuthn) are enabled as an additional first factor alongside the password
+ *   (`signInPolicy`). The relying party ID is the host of `frontendBaseUrl`, so passkeys only work
+ *   on that exact host - not on `localhost` or the default `*.amplifyapp.com` domain - and changing
+ *   it later invalidates every registered passkey.
  * - `keepOriginal: { email: true }` requires verification of a new email address (a code sent to
  *   it) before the attribute actually changes, instead of updating immediately - this backs the
  *   Settings screen's email-change flow, which reuses the same OTP-confirmation UX as sign-up.
@@ -48,8 +52,30 @@ export class AuthStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AuthStackProps) {
     super(scope, id, props);
 
+    // The RP ID must be a registrable suffix of the origin the browser uses, and a pool holds only
+    // one. Derived from frontendBaseUrl so it can't drift from the real host; when unset (no known
+    // frontend host) passkeys are left off rather than guessing a domain.
+    const passkeyRelyingPartyId = props.frontendBaseUrl
+      ? new URL(props.frontendBaseUrl).hostname
+      : undefined;
+
     this.userPool = new cognito.UserPool(this, 'UserPool', {
       userPoolName: `household-${props.stage}-user-pool`,
+      // Passkeys require Essentials or higher. Pinned to the tier the prod pool already runs on
+      // (confirmed via `describe-user-pool`) so this is a no-op there, and so CDK's own check that
+      // rejects non-password factors on LITE can't be tripped by an implicit default.
+      featurePlan: cognito.FeaturePlan.ESSENTIALS,
+      ...(passkeyRelyingPartyId
+        ? {
+            // Passkey is an additional first factor next to the password, not a replacement:
+            // registering a passkey needs an already-signed-in session, and password reset is the
+            // recovery path when a device is lost. CDK requires `password: true` anyway.
+            signInPolicy: { allowedFirstAuthFactors: { password: true, passkey: true } },
+            passkeyRelyingPartyId,
+            // A passkey that can be used without biometrics/PIN would be a single weak factor.
+            passkeyUserVerification: cognito.PasskeyUserVerification.REQUIRED,
+          }
+        : {}),
       selfSignUpEnabled: true,
       signInAliases: { email: true },
       autoVerify: { email: true },
@@ -107,7 +133,9 @@ export class AuthStack extends cdk.Stack {
 
     this.userPoolClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
       userPool: this.userPool,
-      authFlows: { userSrp: true },
+      // `userSrp` stays for the existing password login (amazon-cognito-identity-js); `user`
+      // (ALLOW_USER_AUTH, choice-based sign-in) is what the passkey sign-in flow starts from.
+      authFlows: { userSrp: true, user: true },
       generateSecret: false, // public SPA client (frontend talks to Cognito directly)
       supportedIdentityProviders: [cognito.UserPoolClientIdentityProvider.COGNITO],
       accessTokenValidity: cdk.Duration.hours(1),

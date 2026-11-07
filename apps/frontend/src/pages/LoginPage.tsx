@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Wallet } from 'lucide-react';
+import { KeyRound, Wallet } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,13 +21,16 @@ import {
   type EmailPasswordFormValues,
   type TotpCodeFormValues,
 } from '@/lib/auth-schema';
-import { signInWithEmailPassword } from '@/lib/auth';
+import { signInWithEmailPassword, type SignInResult } from '@/lib/auth';
+import { isPasskeySupported, signInWithPasskey } from '@/lib/passkey';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get('redirect');
   const [error, setError] = useState<string | null>(null);
+  const [isPasskeySubmitting, setIsPasskeySubmitting] = useState(false);
+  const passkeySupported = isPasskeySupported();
   const [step, setStep] = useState<'password' | 'mfaCode'>('password');
   const [confirmMfaCode, setConfirmMfaCode] = useState<((code: string) => Promise<void>) | null>(
     null,
@@ -42,20 +45,38 @@ export default function LoginPage() {
     defaultValues: { code: '' },
   });
 
+  // パスワード・パスキーのどちらのログインでも、TOTP MFA が必要なら同じ6桁コード入力へ合流させる。
+  function handleSignInResult(result: SignInResult) {
+    if (result.status === 'success') {
+      navigate(redirect ?? '/dashboard');
+      return;
+    }
+    setConfirmMfaCode(() => result.confirmMfaCode);
+    setStep('mfaCode');
+  }
+
   const onSubmit = form.handleSubmit(async (values) => {
     setError(null);
     try {
-      const result = await signInWithEmailPassword(values);
-      if (result.status === 'success') {
-        navigate(redirect ?? '/dashboard');
-        return;
-      }
-      setConfirmMfaCode(() => result.confirmMfaCode);
-      setStep('mfaCode');
+      handleSignInResult(await signInWithEmailPassword(values));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'ログインに失敗しました');
     }
   });
+
+  async function onPasskeyLogin() {
+    setError(null);
+    // パスキーのログインはユーザー名（メール）を先に Cognito へ渡す方式のため、メール欄だけ検証する。
+    if (!(await form.trigger('email'))) return;
+    setIsPasskeySubmitting(true);
+    try {
+      handleSignInResult(await signInWithPasskey(form.getValues('email')));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'パスキーでログインできませんでした');
+    } finally {
+      setIsPasskeySubmitting(false);
+    }
+  }
 
   const onSubmitMfaCode = mfaForm.handleSubmit(async (values) => {
     if (!confirmMfaCode) return;
@@ -113,12 +134,24 @@ export default function LoginPage() {
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <Button
                   type="submit"
-                  disabled={form.formState.isSubmitting}
+                  disabled={form.formState.isSubmitting || isPasskeySubmitting}
                   loading={form.formState.isSubmitting}
                   className="mt-2"
                 >
                   ログイン
                 </Button>
+                {passkeySupported && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={form.formState.isSubmitting || isPasskeySubmitting}
+                    loading={isPasskeySubmitting}
+                    onClick={onPasskeyLogin}
+                  >
+                    <KeyRound aria-hidden="true" />
+                    パスキーでログイン
+                  </Button>
+                )}
               </form>
             </Form>
           ) : (

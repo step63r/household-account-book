@@ -21,6 +21,7 @@ import { ChangePasswordDialog } from '@/components/settings/ChangePasswordDialog
 import { EditHouseholdNameDialog } from '@/components/settings/EditHouseholdNameDialog';
 import { InviteMemberDialog } from '@/components/settings/InviteMemberDialog';
 import { MfaSection } from '@/components/settings/MfaSection';
+import { PasskeySection } from '@/components/settings/PasskeySection';
 import { requestAccountWithdrawal } from '@/lib/account';
 import { getCurrentSession, signOut } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
@@ -151,6 +152,7 @@ export default function SettingsPage() {
             <ChangePasswordDialog onSuccess={handleSuccess} />
           </div>
           <MfaSection email={email} onSuccess={handleSuccess} />
+          <PasskeySection onSuccess={handleSuccess} />
         </CardContent>
       </Card>
 
