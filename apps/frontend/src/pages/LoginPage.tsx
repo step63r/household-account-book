@@ -16,29 +16,44 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import {
-  emailPasswordSchema,
+  loginEmailSchema,
+  loginPasswordSchema,
   totpCodeSchema,
-  type EmailPasswordFormValues,
+  type LoginEmailFormValues,
+  type LoginPasswordFormValues,
   type TotpCodeFormValues,
 } from '@/lib/auth-schema';
 import { signInWithEmailPassword, type SignInResult } from '@/lib/auth';
-import { isPasskeySupported, signInWithPasskey } from '@/lib/passkey';
+import { discoverSignInMethod, signInWithPasskey } from '@/lib/passkey';
+
+type Step = 'email' | 'passkey' | 'password' | 'mfaCode';
+
+const STEP_DESCRIPTIONS: Record<Step, string> = {
+  email: 'メールアドレスを入力してください',
+  passkey: 'パスキーで本人確認します',
+  password: 'パスワードを入力してください',
+  mfaCode: '認証アプリに表示されている6桁のコードを入力してください',
+};
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get('redirect');
   const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<Step>('email');
+  const [email, setEmail] = useState('');
   const [isPasskeySubmitting, setIsPasskeySubmitting] = useState(false);
-  const passkeySupported = isPasskeySupported();
-  const [step, setStep] = useState<'password' | 'mfaCode'>('password');
   const [confirmMfaCode, setConfirmMfaCode] = useState<((code: string) => Promise<void>) | null>(
     null,
   );
 
-  const form = useForm<EmailPasswordFormValues>({
-    resolver: zodResolver(emailPasswordSchema),
-    defaultValues: { email: '', password: '' },
+  const emailForm = useForm<LoginEmailFormValues>({
+    resolver: zodResolver(loginEmailSchema),
+    defaultValues: { email: '' },
+  });
+  const passwordForm = useForm<LoginPasswordFormValues>({
+    resolver: zodResolver(loginPasswordSchema),
+    defaultValues: { password: '' },
   });
   const mfaForm = useForm<TotpCodeFormValues>({
     resolver: zodResolver(totpCodeSchema),
@@ -55,10 +70,28 @@ export default function LoginPage() {
     setStep('mfaCode');
   }
 
-  const onSubmit = form.handleSubmit(async (values) => {
+  function goToStep(next: Step) {
+    setError(null);
+    setStep(next);
+  }
+
+  function backToEmail() {
+    passwordForm.reset();
+    goToStep('email');
+  }
+
+  // 入力されたメールアドレスのアカウントがパスキーを使えるかで、次の画面を分ける。
+  // 判定に失敗してもパスワード画面に進むので、ここで例外は出ない。
+  const onSubmitEmail = emailForm.handleSubmit(async (values) => {
+    setError(null);
+    setEmail(values.email);
+    goToStep((await discoverSignInMethod(values.email)) === 'passkey' ? 'passkey' : 'password');
+  });
+
+  const onSubmitPassword = passwordForm.handleSubmit(async (values) => {
     setError(null);
     try {
-      handleSignInResult(await signInWithEmailPassword(values));
+      handleSignInResult(await signInWithEmailPassword({ email, password: values.password }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'ログインに失敗しました');
     }
@@ -66,11 +99,9 @@ export default function LoginPage() {
 
   async function onPasskeyLogin() {
     setError(null);
-    // パスキーのログインはユーザー名（メール）を先に Cognito へ渡す方式のため、メール欄だけ検証する。
-    if (!(await form.trigger('email'))) return;
     setIsPasskeySubmitting(true);
     try {
-      handleSignInResult(await signInWithPasskey(form.getValues('email')));
+      handleSignInResult(await signInWithPasskey(email));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'パスキーでログインできませんでした');
     } finally {
@@ -89,43 +120,108 @@ export default function LoginPage() {
     }
   });
 
+  const linkButtonClass = 'text-sm text-primary underline-offset-4 hover:underline';
+
   return (
     <div className="flex min-h-svh items-center justify-center px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
           <Wallet className="mb-2 size-8 text-primary" aria-hidden="true" />
           <CardTitle>ログイン</CardTitle>
-          <CardDescription>
-            {step === 'password'
-              ? '家計簿アプリにログインします'
-              : '認証アプリに表示されている6桁のコードを入力してください'}
-          </CardDescription>
+          <CardDescription>{STEP_DESCRIPTIONS[step]}</CardDescription>
         </CardHeader>
         <CardContent>
-          {step === 'password' ? (
-            <Form key="password-form" {...form}>
-              <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          {step === 'email' && (
+            <Form key="email-form" {...emailForm}>
+              <form onSubmit={onSubmitEmail} className="flex flex-col gap-4">
                 <FormField
-                  control={form.control}
+                  control={emailForm.control}
                   name="email"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>メールアドレス</FormLabel>
                       <FormControl>
-                        <Input type="email" autoComplete="email" {...field} />
+                        <Input type="email" autoComplete="username" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                <Button
+                  type="submit"
+                  disabled={emailForm.formState.isSubmitting}
+                  loading={emailForm.formState.isSubmitting}
+                  className="mt-2"
+                >
+                  次へ
+                </Button>
+              </form>
+            </Form>
+          )}
+
+          {step === 'passkey' && (
+            <div className="flex flex-col gap-4">
+              <p className="break-all text-center text-sm text-muted-foreground">{email}</p>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              {/* 認証器の呼び出しは直前のタップ操作が必要なブラウザがあるため、自動では開始せずボタンにする。 */}
+              <Button
+                type="button"
+                disabled={isPasskeySubmitting}
+                loading={isPasskeySubmitting}
+                onClick={onPasskeyLogin}
+              >
+                <KeyRound aria-hidden="true" />
+                パスキーで認証
+              </Button>
+              <div className="flex flex-col items-center gap-2">
+                <button
+                  type="button"
+                  className={linkButtonClass}
+                  disabled={isPasskeySubmitting}
+                  onClick={() => goToStep('password')}
+                >
+                  パスワードでログインする
+                </button>
+                <button
+                  type="button"
+                  className={linkButtonClass}
+                  disabled={isPasskeySubmitting}
+                  onClick={backToEmail}
+                >
+                  別のメールアドレスを使う
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 'password' && (
+            <Form key="password-form" {...passwordForm}>
+              <form onSubmit={onSubmitPassword} className="flex flex-col gap-4">
+                <p className="break-all text-center text-sm text-muted-foreground">{email}</p>
+                {/* パスワードマネージャーが保存先のユーザー名を特定できるよう、メールを欄として残す。 */}
+                <input
+                  type="email"
+                  name="username"
+                  autoComplete="username"
+                  value={email}
+                  readOnly
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  className="sr-only"
+                />
                 <FormField
-                  control={form.control}
+                  control={passwordForm.control}
                   name="password"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>パスワード</FormLabel>
                       <FormControl>
-                        <Input type="password" autoComplete="current-password" {...field} />
+                        <Input
+                          type="password"
+                          autoComplete="current-password"
+                          autoFocus
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -134,27 +230,22 @@ export default function LoginPage() {
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <Button
                   type="submit"
-                  disabled={form.formState.isSubmitting || isPasskeySubmitting}
-                  loading={form.formState.isSubmitting}
+                  disabled={passwordForm.formState.isSubmitting}
+                  loading={passwordForm.formState.isSubmitting}
                   className="mt-2"
                 >
                   ログイン
                 </Button>
-                {passkeySupported && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={form.formState.isSubmitting || isPasskeySubmitting}
-                    loading={isPasskeySubmitting}
-                    onClick={onPasskeyLogin}
-                  >
-                    <KeyRound aria-hidden="true" />
-                    パスキーでログイン
-                  </Button>
-                )}
+                <div className="flex flex-col items-center gap-2">
+                  <button type="button" className={linkButtonClass} onClick={backToEmail}>
+                    別のメールアドレスを使う
+                  </button>
+                </div>
               </form>
             </Form>
-          ) : (
+          )}
+
+          {step === 'mfaCode' && (
             <Form key="mfa-form" {...mfaForm}>
               <form onSubmit={onSubmitMfaCode} className="flex flex-col gap-4">
                 <FormField
@@ -187,7 +278,8 @@ export default function LoginPage() {
               </form>
             </Form>
           )}
-          {step === 'password' && (
+
+          {step !== 'mfaCode' && (
             <>
               <p className="mt-4 text-center text-sm text-muted-foreground">
                 アカウントをお持ちでない方は{' '}

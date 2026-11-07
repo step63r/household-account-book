@@ -129,6 +129,34 @@ function toTokens(result: AuthenticationResultType | undefined) {
   };
 }
 
+export type SignInMethod = 'passkey' | 'password';
+
+/**
+ * メールアドレスから、そのアカウントがまず進むべきログイン方法を判定する（ログイン画面の分岐用）。
+ *
+ * パスキーを希望して `USER_AUTH` を開始し、Cognito が `WEB_AUTHN` チャレンジを返したときだけ
+ * `'passkey'` にする。パスキー未登録・TOTP MFA 有効（選択型サインインではパスワードしか選べない）・
+ * 存在しないメールアドレス・通信エラーはいずれも `'password'` に倒す。画面上で存在有無を区別して
+ * 見せないためと、判定に失敗してもパスワードでログインできる状態を保つため。
+ * ここで開始したセッションは使い捨てで、パスキー認証は `signInWithPasskey` が改めて開始する。
+ */
+export async function discoverSignInMethod(email: string): Promise<SignInMethod> {
+  if (!isPasskeySupported()) return 'password';
+  try {
+    const { client, config } = getClient();
+    const init = await client.send(
+      new InitiateAuthCommand({
+        ClientId: config.clientId,
+        AuthFlow: 'USER_AUTH',
+        AuthParameters: { USERNAME: email, PREFERRED_CHALLENGE: 'WEB_AUTHN' },
+      }),
+    );
+    return init.ChallengeName === 'WEB_AUTHN' ? 'passkey' : 'password';
+  } catch {
+    return 'password';
+  }
+}
+
 /**
  * パスキーでログインする。メールアドレスが必要（Cognito の `USER_AUTH` はユーザー名を先に渡す方式）。
  * TOTP MFA が有効なユーザーに Cognito が追加チャレンジを返した場合は、パスワードログインと同じ
@@ -199,6 +227,12 @@ export async function signInWithPasskey(email: string): Promise<SignInResult> {
 
     throw new PasskeyError(LOGIN_FAILED_MESSAGE);
   } catch (e) {
+    // 画面には丸めた文言しか出さないため、原因調査用に例外名とメッセージだけ残す（メール・トークンは出さない）。
+    console.error(
+      '[passkey] sign-in failed:',
+      errorName(e) || 'unknown',
+      e instanceof Error ? e.message : '',
+    );
     throw new Error(describeLoginError(e));
   }
 }

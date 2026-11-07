@@ -25,6 +25,14 @@ export const emailPasswordSchema = z.object({
 });
 export type EmailPasswordFormValues = z.infer<typeof emailPasswordSchema>;
 
+/** ログイン画面の第1段階（メールアドレスのみ）用。ルールは emailPasswordSchema と共通。 */
+export const loginEmailSchema = emailPasswordSchema.pick({ email: true });
+export type LoginEmailFormValues = z.infer<typeof loginEmailSchema>;
+
+/** ログイン画面の第2段階（パスワード）用。ルールは emailPasswordSchema と共通。 */
+export const loginPasswordSchema = emailPasswordSchema.pick({ password: true });
+export type LoginPasswordFormValues = z.infer<typeof loginPasswordSchema>;
+
 /**
  * サインアップフォーム専用スキーマ。emailPasswordSchema はログインフォーム
  * （LoginPage.tsx）とも共有しているため、そちらを直接拡張すると同意チェックボックスの

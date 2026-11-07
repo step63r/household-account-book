@@ -102,6 +102,16 @@ export class AuthStack extends cdk.Stack {
       }),
     });
 
+    if (passkeyRelyingPartyId) {
+      // Without this, a user who has enrolled TOTP MFA is never offered WEB_AUTHN in choice-based
+      // sign-in (only PASSWORD/PASSWORD_SRP) while MFA is OPTIONAL, per the Cognito MFA docs. That
+      // locks out exactly the users who care most about security. With this set, a passkey used
+      // with user verification (biometrics/PIN, enforced above) counts as satisfying MFA by itself.
+      // No L2 property exists for it yet, hence the escape hatch.
+      (this.userPool.node.defaultChild as cognito.CfnUserPool).webAuthnFactorConfiguration =
+        'MULTI_FACTOR_WITH_USER_VERIFICATION';
+    }
+
     // Customizes the CustomMessage_ForgotPassword email to embed the confirmation code in a
     // reset-password link (${FRONTEND_BASE_URL}/reset-password?email=...&code=...) instead of
     // Cognito's default plain-code email. See apps/backend/src/handlers/customMessage.ts.

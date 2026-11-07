@@ -36,6 +36,7 @@ vi.mock('@/lib/auth', () => ({
 
 import {
   deletePasskey,
+  discoverSignInMethod,
   isPasskeySupported,
   listPasskeys,
   registerPasskey,
@@ -99,6 +100,47 @@ describe('isPasskeySupported', () => {
   it('JSON ヘルパーが無い古いブラウザでは false', () => {
     vi.stubGlobal('PublicKeyCredential', class {});
     expect(isPasskeySupported()).toBe(false);
+  });
+});
+
+describe('discoverSignInMethod', () => {
+  it('パスキーを希望して開始し、WEB_AUTHN チャレンジが返れば passkey', async () => {
+    sendMock.mockResolvedValueOnce({ ChallengeName: 'WEB_AUTHN', Session: 's' });
+
+    await expect(discoverSignInMethod('a@example.com')).resolves.toBe('passkey');
+    expect(commandInput('InitiateAuth')).toMatchObject({
+      AuthFlow: 'USER_AUTH',
+      AuthParameters: { USERNAME: 'a@example.com', PREFERRED_CHALLENGE: 'WEB_AUTHN' },
+    });
+    // 判定だけで認証器やセッション保存には触れない。
+    expect(credentialsGet).not.toHaveBeenCalled();
+    expect(establishSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('パスキー未登録・TOTP有効（パスワードしか選べない）なら password', async () => {
+    sendMock.mockResolvedValueOnce({
+      ChallengeName: 'SELECT_CHALLENGE',
+      AvailableChallenges: ['PASSWORD_SRP', 'PASSWORD'],
+    });
+
+    await expect(discoverSignInMethod('a@example.com')).resolves.toBe('password');
+  });
+
+  it('存在しないメールアドレスも通信エラーも、例外にせず password に倒す', async () => {
+    sendMock.mockRejectedValueOnce(
+      Object.assign(new Error('User does not exist.'), { name: 'UserNotFoundException' }),
+    );
+    await expect(discoverSignInMethod('nobody@example.com')).resolves.toBe('password');
+
+    sendMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(discoverSignInMethod('a@example.com')).resolves.toBe('password');
+  });
+
+  it('ブラウザがパスキー非対応なら Cognito を呼ばずに password', async () => {
+    vi.stubGlobal('PublicKeyCredential', undefined);
+
+    await expect(discoverSignInMethod('a@example.com')).resolves.toBe('password');
+    expect(sendMock).not.toHaveBeenCalled();
   });
 });
 
