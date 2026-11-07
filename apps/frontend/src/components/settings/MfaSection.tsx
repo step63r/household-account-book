@@ -36,9 +36,11 @@ function buildOtpAuthUri(email: string, secretCode: string): string {
 
 function EnrollDialog({
   email,
+  disabled,
   onEnrolled,
 }: {
   email: string | null;
+  disabled: boolean;
   onEnrolled: (message: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -83,7 +85,7 @@ function EnrollDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
+        <Button type="button" variant="outline" size="sm" disabled={disabled}>
           設定する
         </Button>
       </DialogTrigger>
@@ -206,9 +208,15 @@ function DisableDialog({ onDisabled }: { onDisabled: (message: string) => void }
 
 export function MfaSection({
   email,
+  hasPasskey,
+  onStatusChange,
   onSuccess,
 }: {
   email: string | null;
+  /** パスキーを登録済みか。Cognito は MFA 設定済みユーザーのパスキーログインを許さないため、真なら新規設定を止める。 */
+  hasPasskey: boolean;
+  /** MFA の有効状態（取得前・失敗時は null）を親へ伝える。パスキー側の排他制御に使う。 */
+  onStatusChange: (enabled: boolean | null) => void;
   onSuccess: (message: string) => void;
 }) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
@@ -223,26 +231,38 @@ export function MfaSection({
     refreshStatus();
   }, []);
 
+  useEffect(() => {
+    onStatusChange(enabled);
+  }, [enabled, onStatusChange]);
+
   function handleChanged(message: string) {
     onSuccess(message);
     refreshStatus();
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
-      <div>
-        <p className="text-sm font-medium">二要素認証（MFA）</p>
-        <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          {enabled ? '有効' : '無効'}
-          <InfoTooltip label="二要素認証（MFA）の説明">
-            認証アプリの6桁コードでログインを保護します
-          </InfoTooltip>
-        </p>
+    <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium">二要素認証（MFA）</p>
+          <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            {enabled ? '有効' : '無効'}
+            <InfoTooltip label="二要素認証（MFA）の説明">
+              認証アプリの6桁コードでログインを保護します
+            </InfoTooltip>
+          </p>
+        </div>
+        {enabled ? (
+          <DisableDialog onDisabled={handleChanged} />
+        ) : (
+          <EnrollDialog email={email} disabled={hasPasskey} onEnrolled={handleChanged} />
+        )}
       </div>
-      {enabled ? (
-        <DisableDialog onDisabled={handleChanged} />
-      ) : (
-        <EnrollDialog email={email} onEnrolled={handleChanged} />
+      {/* 無効化は常に押せるようにし、ここで止めるのは新規設定だけにする（出口を塞がないため）。 */}
+      {!enabled && hasPasskey && (
+        <p className="text-xs text-muted-foreground">
+          二段階認証（MFA）設定を行うにはパスキーを削除する必要があります
+        </p>
       )}
     </div>
   );

@@ -15,7 +15,17 @@ function formatCreatedAt(createdAt: Date | null): string {
   return createdAt ? `${createdAt.toLocaleDateString('ja-JP')} 登録` : '登録日不明';
 }
 
-export function PasskeySection({ onSuccess }: { onSuccess: (message: string) => void }) {
+export function PasskeySection({
+  mfaEnabled,
+  onStatusChange,
+  onSuccess,
+}: {
+  /** MFA を有効化済みか。Cognito は MFA 設定済みユーザーのパスキーログインを許さないため、真なら追加を止める。 */
+  mfaEnabled: boolean;
+  /** パスキーを1件以上登録済みか（取得前・失敗時は null）を親へ伝える。MFA 側の排他制御に使う。 */
+  onStatusChange: (hasPasskey: boolean | null) => void;
+  onSuccess: (message: string) => void;
+}) {
   const supported = isPasskeySupported();
   // null は「取得前、または取得失敗」。失敗時に「0件」と誤表示しないよう区別する。
   const [passkeys, setPasskeys] = useState<PasskeySummary[] | null>(null);
@@ -37,6 +47,10 @@ export function PasskeySection({ onSuccess }: { onSuccess: (message: string) => 
     // 非対応ブラウザでも、他端末で登録済みのパスキーの確認・削除はできるよう一覧は取得する。
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    onStatusChange(passkeys === null ? null : passkeys.length > 0);
+  }, [passkeys, onStatusChange]);
 
   async function handleRegister() {
     setIsRegistering(true);
@@ -90,7 +104,7 @@ export function PasskeySection({ onSuccess }: { onSuccess: (message: string) => 
             type="button"
             variant="outline"
             size="sm"
-            disabled={isRegistering}
+            disabled={isRegistering || mfaEnabled}
             loading={isRegistering}
             onClick={handleRegister}
           >
@@ -98,6 +112,13 @@ export function PasskeySection({ onSuccess }: { onSuccess: (message: string) => 
           </Button>
         )}
       </div>
+
+      {/* 削除は常に押せるようにし、ここで止めるのは新規追加だけにする（出口を塞がないため）。 */}
+      {mfaEnabled && (
+        <p className="text-xs text-muted-foreground">
+          パスキー設定を行うには二段階認証（MFA）を無効化する必要があります
+        </p>
+      )}
 
       {!supported && (
         <p className="text-sm text-muted-foreground">

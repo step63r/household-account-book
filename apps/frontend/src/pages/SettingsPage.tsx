@@ -36,6 +36,10 @@ export default function SettingsPage() {
   // ID トークンの email クレームから表示する（GET /users/me 相当のバックエンドAPIはまだ無い）
   const [email, setEmail] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  // Cognito は MFA 設定済みユーザーのパスキーログインを許さないため、両セクションが互いの状態を
+  // 見て新規設定を止める。取得前・失敗時の null は「止めない」扱い（取得失敗で永久に押せなくなるのを避ける）。
+  const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
+  const [hasPasskey, setHasPasskey] = useState<boolean | null>(null);
 
   const householdQuery = useHousehold();
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
@@ -151,8 +155,17 @@ export default function SettingsPage() {
             </div>
             <ChangePasswordDialog onSuccess={handleSuccess} />
           </div>
-          <MfaSection email={email} onSuccess={handleSuccess} />
-          <PasskeySection onSuccess={handleSuccess} />
+          <MfaSection
+            email={email}
+            hasPasskey={hasPasskey === true}
+            onStatusChange={setMfaEnabled}
+            onSuccess={handleSuccess}
+          />
+          <PasskeySection
+            mfaEnabled={mfaEnabled === true}
+            onStatusChange={setHasPasskey}
+            onSuccess={handleSuccess}
+          />
         </CardContent>
       </Card>
 
