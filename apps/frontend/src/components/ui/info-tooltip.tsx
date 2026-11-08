@@ -26,7 +26,7 @@ function InfoTooltip({
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="bg-primary text-primary-foreground w-auto max-w-64 rounded-md border-none px-3 py-1.5 text-xs text-balance shadow-md"
+        className="bg-primary text-primary-foreground w-auto max-w-64 rounded-md border-none px-3 py-1.5 text-xs shadow-md"
       >
         {children}
       </PopoverContent>
