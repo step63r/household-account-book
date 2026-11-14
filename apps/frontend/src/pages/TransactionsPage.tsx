@@ -319,7 +319,8 @@ export default function TransactionsPage() {
   }
 
   const filteredTransactions = useMemo(() => {
-    const trimmedMemoQuery = memoQuery.trim();
+    // 大文字小文字を区別しない検索のため、双方を小文字化して比較する
+    const trimmedMemoQuery = memoQuery.trim().toLowerCase();
     return transactions.filter((tx) => {
       if (selectedTypes.length > 0 && !selectedTypes.includes(tx.type)) return false;
       if (
@@ -330,7 +331,9 @@ export default function TransactionsPage() {
       }
       if (!Number.isNaN(amountMin) && Math.abs(tx.amount) < amountMin) return false;
       if (!Number.isNaN(amountMax) && Math.abs(tx.amount) > amountMax) return false;
-      if (trimmedMemoQuery !== '' && !(tx.memo ?? '').includes(trimmedMemoQuery)) return false;
+      if (trimmedMemoQuery !== '' && !(tx.memo ?? '').toLowerCase().includes(trimmedMemoQuery)) {
+        return false;
+      }
       return true;
     });
   }, [transactions, selectedTypes, selectedCategoryIds, amountMin, amountMax, memoQuery]);
