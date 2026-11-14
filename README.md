@@ -82,6 +82,37 @@ Auth（Cognito）/ Data（DynamoDB）/ Api（API Gateway + Lambda）/ Hosting（
 
 フロントエンドは、GitHub App経由で連携されたAmplify Hostingにより、`master`ブランチへのpushで自動ビルド・デプロイされます。
 
+## Deploy Flow
+
+```mermaid
+flowchart TB
+  Dev(["git push master"])
+
+  subgraph CI["GitHub Actions: CI (デプロイなし)"]
+    C1["pnpm format:check / typecheck / lint / test / build"]
+    C2["cdk synth のみ"]
+    C1 --> C2
+  end
+
+  subgraph FE["フロントエンド: 自動"]
+    A1["Amplify Hosting<br/>GitHub App 連携"]
+    A2["ビルド<br/>appRoot: apps/frontend<br/>VITE_* は CDK から注入"]
+    A3["household.minatoproject.com"]
+    A1 --> A2 --> A3
+  end
+
+  subgraph BE["バックエンド / インフラ: 手動"]
+    M1["手元で cdk diff → ユーザー確認 → cdk deploy"]
+    M2["CloudFormation<br/>Household-prod-* の各スタック"]
+    M3["API Gateway / Lambda / DynamoDB / Cognito / EventBridge"]
+    M1 -.-> M2 -.-> M3
+    M2 -.->|"Hosting スタックが Amplify アプリを定義"| A1
+  end
+
+  Dev --> C1
+  Dev --> A1
+```
+
 ## Contribution
 
 1. このリポジトリをフォークする
